@@ -3,36 +3,43 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}Finance Tracker{% endblock %}</title>
+    <title>{% block title %}ExpenseStats{% endblock %}</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
 </head>
-<body style="margin:0;font-family: Arial, sans-serif;background-color:#f4f6f8;">
-    <div style="background:#2ecc71;color:white;padding:15px 30px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;">
-        <h2 style="margin:0;">&#128176; Finance Tracker</h2>
+<body style="margin:0;font-family:'Inter', sans-serif;background:#0f172a;color:white;min-height:100vh;">
+    {% if session.get('user_id') %}
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:16px 30px;background:#020617;border-bottom:1px solid #1e293b;">
+        <a href="/" style="text-decoration:none;font-size:28px;font-weight:700;letter-spacing:1px;display:inline-block;background:linear-gradient(90deg, #bbf7d0, #22c55e, #14b8a6);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;">ExpenseStats</a>
 
-        <div style="display:flex;align-items:center;flex-wrap:wrap;">
-            {% if session.get('user_id') %}
-            <a href="/" style="color:white;margin-right:15px;text-decoration:none;">Home</a>
-            <a href="/add" style="color:white;margin-right:15px;text-decoration:none;">Add</a>
-            <a href="/logout" style="color:white;text-decoration:none;">Logout</a>
-            {% else %}
-            <a href="/login" style="color:white;margin-right:15px;text-decoration:none;">Login</a>
-            <a href="/register" style="color:white;text-decoration:none;">Register</a>
-            {% endif %}
+        <div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap;">
+            <a href="/add" style="color:white;text-decoration:none;font-size:14px;transition:all 0.2s ease;">Add</a>
+            <a href="/about" style="color:white;text-decoration:none;font-size:14px;transition:all 0.2s ease;">About</a>
+            <a href="/logout" style="color:#22c55e;text-decoration:none;font-size:14px;font-weight:600;transition:all 0.2s ease;">Logout</a>
         </div>
     </div>
+    {% endif %}
 
-    <div style="max-width:1100px;margin:auto;margin-top:30px;padding:0 20px 30px;">
+    <div style="max-width:1180px;margin:0 auto;padding:32px 20px 36px;box-sizing:border-box;">
+        <div style="text-align:center;margin-bottom:30px;">
+            <h1 style="font-size:36px;font-weight:700;letter-spacing:1px;line-height:1.1;margin:0 0 12px 0;display:inline-block;background:linear-gradient(90deg, #bbf7d0, #22c55e, #14b8a6);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;">ExpenseStats</h1>
+            <p style="color:#94a3b8;font-size:14px;letter-spacing:0.8px;line-height:1.6;margin:0;">Your spending, decoded.</p>
+        </div>
+
         {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
-        <div style="margin-bottom:20px;">
+        <div style="margin:0 auto 20px auto;max-width:900px;">
             {% for category, message in messages %}
-            <div style="padding:12px 14px;border-radius:8px;margin-bottom:10px;background:{% if category == 'error' %}#fdecea{% else %}#ecf9f1{% endif %};color:{% if category == 'error' %}#e74c3c{% else %}#2e7d32{% endif %};border:1px solid {% if category == 'error' %}#f5c6cb{% else %}#bfe5cb{% endif %};">
+            {% set flash_bg = '#3f1d24' if category == 'error' else '#123524' %}
+            {% set flash_text = '#fca5a5' if category == 'error' else '#86efac' %}
+            {% set flash_border = '#7f1d1d' if category == 'error' else '#166534' %}
+            <div style="padding:12px 14px;border-radius:10px;margin-bottom:10px;background:{{ flash_bg }};color:{{ flash_text }};border:1px solid {{ flash_border }};font-size:14px;">
                 {{ message }}
             </div>
             {% endfor %}
         </div>
         {% endif %}
         {% endwith %}
+
         {% block content %}{% endblock %}
     </div>
 </body>

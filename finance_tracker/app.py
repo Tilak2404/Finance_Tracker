@@ -1,4 +1,5 @@
 import os
+import shutil
 from datetime import UTC, datetime, timedelta
 
 import matplotlib
@@ -18,12 +19,25 @@ import matplotlib.pyplot as plt
 
 app = Flask(__name__)
 app.secret_key = "your_secret_key"
-app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///database.db"
+DEFAULT_DATABASE_PATH = os.path.join(app.root_path, "finance.db")
+app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{DEFAULT_DATABASE_PATH}"
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
 db = SQLAlchemy(app)
+INITIALIZED_DATABASE_URI = None
 
 VALID_TRANSACTION_TYPES = {"income", "expense"}
 KNOWN_PASSWORD_HASH_PREFIXES = ("scrypt:", "pbkdf2:", "argon2:")
+TRANSACTION_CATEGORIES = [
+    "Food",
+    "Transport",
+    "Bills",
+    "Shopping",
+    "Entertainment",
+    "Health",
+    "Education",
+    "Other",
+]
 
 
 def utc_now():
@@ -54,6 +68,19 @@ class Transaction(db.Model):
 
 
 def ensure_database_ready():
+    global INITIALIZED_DATABASE_URI
+
+    current_database_uri = app.config["SQLALCHEMY_DATABASE_URI"]
+    if INITIALIZED_DATABASE_URI == current_database_uri:
+        return
+
+    if current_database_uri == f"sqlite:///{DEFAULT_DATABASE_PATH}" and not os.path.exists(
+        DEFAULT_DATABASE_PATH
+    ):
+        legacy_database_path = os.path.join(app.instance_path, "database.db")
+        if os.path.exists(legacy_database_path):
+            shutil.copy2(legacy_database_path, DEFAULT_DATABASE_PATH)
+
     db.create_all()
 
     inspector = inspect(db.engine)
@@ -86,6 +113,8 @@ def ensure_database_ready():
     if schema_changed:
         db.session.commit()
 
+    INITIALIZED_DATABASE_URI = current_database_uri
+
 
 def verify_user_password(user, entered_password):
     if not user.password.startswith(KNOWN_PASSWORD_HASH_PREFIXES):
@@ -114,14 +143,23 @@ def initialize_database():
 
 def parse_transaction_form(form, default_date=None):
     amount_text = form.get("amount", "").strip()
-    transaction_type = form.get("type", "").strip()
-    category = form.get("category", "").strip()
+    transaction_type = form["type"].strip()
+    if transaction_type == "income":
+        category = "Income"
+    else:
+        try:
+            category = form["category"].strip()
+        except KeyError:
+            category = ""
     description = form.get("description", "").strip()
     tags = form.get("tags", "").strip()
     date_text = form.get("date", "").strip()
 
     if not amount_text or not transaction_type:
         return None, "Invalid input. Amount and type are required."
+
+    if transaction_type == "expense" and not category:
+        return None, "Invalid input. Category is required."
 
     try:
         amount = float(amount_text)
@@ -134,7 +172,7 @@ def parse_transaction_form(form, default_date=None):
     if transaction_type not in VALID_TRANSACTION_TYPES:
         return None, "Invalid input. Type must be income or expense."
 
-    parsed_date = default_date or utc_now()
+    parsed_date = default_date or datetime.now()
     if date_text:
         try:
             parsed_date = datetime.strptime(date_text, "%Y-%m-%d")
@@ -155,6 +193,7 @@ def generate_donut_chart(expense_transactions, balance):
     static_folder = os.path.join(app.root_path, "static")
     os.makedirs(static_folder, exist_ok=True)
     chart_path = os.path.join(static_folder, "chart.png")
+    chart_colors = ["#22c55e", "#4ade80", "#16a34a", "#15803d", "#86efac"]
 
     categories = ["Food", "Transport", "Bills", "Shopping", "Entertainment", "Health"]
     category_totals = {
@@ -181,19 +220,38 @@ def generate_donut_chart(expense_transactions, balance):
             labels.append(category)
             values.append(total)
 
-    plt.figure(figsize=(6, 6))
-    if not values:
-        plt.pie([1], colors=["#dfe6e9"], startangle=90)
-    else:
-        plt.pie(values, labels=labels, autopct="%1.1f%%", startangle=90)
+    plt.style.use("dark_background")
+    fig, ax = plt.subplots(figsize=(6, 6))
+    fig.patch.set_facecolor("#020617")
+    ax.set_facecolor("#020617")
+    pie_colors = [chart_colors[index % len(chart_colors)] for index in range(max(len(values), 1))]
 
-    centre_circle = plt.Circle((0, 0), 0.70, fc="white")
-    fig = plt.gcf()
-    fig.gca().add_artist(centre_circle)
+    if not values:
+        ax.pie(
+            [1],
+            colors=[chart_colors[0]],
+            startangle=90,
+            textprops={"color": "white"},
+            wedgeprops={"linewidth": 1, "edgecolor": "#0f172a"},
+        )
+    else:
+        ax.pie(
+            values,
+            labels=labels,
+            colors=pie_colors,
+            autopct="%1.1f%%",
+            startangle=90,
+            textprops={"color": "white"},
+            wedgeprops={"linewidth": 1, "edgecolor": "#0f172a"},
+        )
+
+    centre_circle = plt.Circle((0, 0), 0.70, fc="#020617")
+    ax.add_artist(centre_circle)
     plt.text(
         0,
         0,
         f"\u20b9{balance:.2f}",
+        color="white",
         horizontalalignment="center",
         verticalalignment="center",
         fontsize=16,
@@ -203,13 +261,17 @@ def generate_donut_chart(expense_transactions, balance):
         0,
         -0.2,
         "Balance",
+        color="white",
         horizontalalignment="center",
         fontsize=10,
     )
-    plt.axis("equal")
-    plt.title("Expenses by Category")
-    plt.savefig(chart_path, bbox_inches="tight")
-    plt.close()
+    for spine in ax.spines.values():
+        spine.set_visible(False)
+    ax.tick_params(colors="white")
+    ax.axis("equal")
+    plt.title("Expenses by Category", color="white")
+    plt.savefig(chart_path, bbox_inches="tight", facecolor=fig.get_facecolor())
+    plt.close(fig)
 
 
 def generate_trend_chart(expense_transactions):
@@ -228,22 +290,29 @@ def generate_trend_chart(expense_transactions):
     dates = sorted(expense_by_date.keys())
     values = [expense_by_date[date] for date in dates]
 
-    plt.figure(figsize=(8, 4))
-    if not values:
-        plt.text(0.5, 0.5, "No Expense Data", ha="center", va="center", fontsize=12)
-        plt.axis("off")
-    else:
-        plt.plot(dates, values, marker="o", color="#2ecc71", linewidth=2)
-        plt.fill_between(dates, values, color="#2ecc71", alpha=0.12)
-        plt.xlabel("Date")
-        plt.ylabel("Expenses")
-        plt.title("Expense Trend Over Time")
-        plt.xticks(rotation=45, ha="right")
-        plt.grid(axis="y", linestyle="--", alpha=0.4)
-        plt.tight_layout()
+    plt.style.use("dark_background")
+    fig, ax = plt.subplots(figsize=(8, 4))
+    fig.patch.set_facecolor("#020617")
+    ax.set_facecolor("#020617")
 
-    plt.savefig(trend_path, bbox_inches="tight")
-    plt.close()
+    if not values:
+        ax.text(0.5, 0.5, "No Expense Data", ha="center", va="center", fontsize=12, color="white")
+        ax.axis("off")
+    else:
+        ax.plot(dates, values, marker="o", color="#22c55e", linewidth=2)
+        ax.fill_between(dates, values, color="#16a34a", alpha=0.18)
+        ax.set_xlabel("Date", color="white")
+        ax.set_ylabel("Amount", color="white")
+        ax.set_title("Expense Trend Over Time", color="white")
+        ax.tick_params(colors="white")
+        plt.xticks(rotation=45, ha="right")
+        plt.grid(color="#1e293b", linestyle="--", linewidth=0.5)
+
+    for spine in ax.spines.values():
+        spine.set_visible(False)
+    fig.tight_layout()
+    plt.savefig(trend_path, bbox_inches="tight", facecolor=fig.get_facecolor())
+    plt.close(fig)
 
 
 def build_insights(filtered_expense_transactions, all_expense_transactions):
@@ -559,11 +628,17 @@ def add_transaction():
     if "user_id" not in session:
         return redirect("/login")
 
+    today = datetime.now().strftime("%Y-%m-%d")
+    t_type = request.args.get("type", "expense")
+    if t_type not in VALID_TRANSACTION_TYPES:
+        t_type = "expense"
+
     if request.method == "POST":
+        t_type = request.form.get("type", "expense")
         transaction_data, error_message = parse_transaction_form(request.form)
         if error_message:
             flash(error_message, "error")
-            return render_template("add.html")
+            return render_template("add.html", today=today, type=t_type)
 
         try:
             transaction = Transaction(
@@ -580,12 +655,12 @@ def add_transaction():
         except SQLAlchemyError:
             db.session.rollback()
             flash("Something went wrong. Please try again.", "error")
-            return render_template("add.html")
+            return render_template("add.html", today=today, type=t_type)
 
         flash("Transaction saved successfully.", "success")
         return redirect("/")
 
-    return render_template("add.html")
+    return render_template("add.html", today=today, type=t_type)
 
 
 @app.route("/delete/<int:id>")
@@ -673,6 +748,14 @@ def chart():
         return redirect("/")
 
     return render_template("chart.html")
+
+
+@app.route("/about")
+def about():
+    if "user_id" not in session:
+        return redirect("/login")
+
+    return render_template("about.html")
 
 
 @app.route("/download_report")

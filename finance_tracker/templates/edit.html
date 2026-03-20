@@ -1,39 +1,53 @@
 {% extends "base.html" %}
 
-{% block title %}Edit Transaction | Finance Tracker{% endblock %}
+{% block title %}Edit Transaction | ExpenseStats{% endblock %}
 
 {% block content %}
-<div style="max-width:450px;margin:0 auto;background:white;padding:30px;border-radius:12px;box-shadow:0 4px 10px rgba(0,0,0,0.1);">
-    <h2 style="margin-top:0;text-align:center;color:#333;">Edit Transaction</h2>
-    <p style="text-align:center;color:#666;margin-bottom:25px;">Update the transaction details below.</p>
+<div style="max-width:500px;margin:0 auto;background:#020617;padding:32px;border-radius:16px;border:1px solid #1e293b;box-shadow:0 20px 40px rgba(0,0,0,0.5), 0 0 20px rgba(34,197,94,0.08);transition:all 0.2s ease;">
+    <h2 style="margin-top:0;margin-bottom:10px;text-align:center;font-size:28px;display:inline-block;width:100%;background:linear-gradient(90deg, #f8fafc, #bbf7d0);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;">Edit Transaction</h2>
+    <p style="text-align:center;color:#94a3b8;margin-bottom:26px;line-height:1.7;">Update the transaction details below.</p>
 
     <form method="POST">
-        <label for="date" style="display:block;margin-bottom:6px;color:#333;font-weight:bold;">Date</label>
-        <input type="date" id="date" name="date" value="{{ request.form.get('date', transaction.date.strftime('%Y-%m-%d') if transaction.date else '') }}" style="width:100%;padding:10px;margin-bottom:10px;border-radius:5px;border:1px solid #ccc;box-sizing:border-box;">
+        <label for="date" style="display:block;margin-bottom:8px;color:#cbd5e1;font-weight:600;">Date</label>
+        <input type="date" id="date" name="date" value="{{ request.form.get('date', transaction.date.strftime('%Y-%m-%d') if transaction.date else '') }}" style="width:100%;padding:12px;margin-bottom:14px;border-radius:8px;border:1px solid #334155;background:#1e293b;color:white;box-sizing:border-box;outline:none;transition:all 0.2s ease;">
 
-        <label for="amount" style="display:block;margin-bottom:6px;color:#333;font-weight:bold;">Amount</label>
-        <input type="number" id="amount" name="amount" step="0.01" min="0" value="{{ request.form.get('amount', transaction.amount) }}" required style="width:100%;padding:10px;margin-bottom:10px;border-radius:5px;border:1px solid #ccc;box-sizing:border-box;">
+        <label for="amount" style="display:block;margin-bottom:8px;color:#cbd5e1;font-weight:600;">Amount</label>
+        <input type="number" id="amount" name="amount" step="0.01" min="0" value="{{ request.form.get('amount', transaction.amount) }}" required style="width:100%;padding:12px;margin-bottom:14px;border-radius:8px;border:1px solid #334155;background:#1e293b;color:white;box-sizing:border-box;outline:none;transition:all 0.2s ease;">
 
-        <label for="type" style="display:block;margin-bottom:6px;color:#333;font-weight:bold;">Type</label>
-        <select id="type" name="type" required style="width:100%;padding:10px;margin-bottom:10px;border-radius:5px;border:1px solid #ccc;box-sizing:border-box;">
+        <label for="type" style="display:block;margin-bottom:8px;color:#cbd5e1;font-weight:600;">Type</label>
+        <select id="type" name="type" required style="width:100%;padding:12px;margin-bottom:14px;border-radius:8px;border:1px solid #334155;background:#1e293b;color:white;box-sizing:border-box;outline:none;transition:all 0.2s ease;">
             <option value="income" {% if request.form.get('type', transaction.type) == 'income' %}selected{% endif %}>Income</option>
             <option value="expense" {% if request.form.get('type', transaction.type) == 'expense' %}selected{% endif %}>Expense</option>
         </select>
 
-        <label for="category" style="display:block;margin-bottom:6px;color:#333;font-weight:bold;">Category</label>
-        <input type="text" id="category" name="category" value="{{ request.form.get('category', transaction.category or '') }}" style="width:100%;padding:10px;margin-bottom:10px;border-radius:5px;border:1px solid #ccc;box-sizing:border-box;">
+        <label for="category" style="display:block;margin-bottom:8px;color:#cbd5e1;font-weight:600;">Category</label>
+        {% set selected_category = request.form.get('category', transaction.category or '') %}
+        <select id="category" name="category" required style="width:100%;padding:12px;margin-bottom:14px;border-radius:8px;border:1px solid #334155;background:#1e293b;color:white;box-sizing:border-box;outline:none;transition:all 0.2s ease;">
+            <option value="" disabled {% if not selected_category %}selected{% endif %}>Select Category</option>
+            {% if selected_category and selected_category not in ['Food', 'Transport', 'Bills', 'Shopping', 'Entertainment', 'Health', 'Education', 'Other'] %}
+            <option value="{{ selected_category }}" selected>{{ selected_category }}</option>
+            {% endif %}
+            <option value="Food" {% if selected_category == 'Food' %}selected{% endif %}>Food</option>
+            <option value="Transport" {% if selected_category == 'Transport' %}selected{% endif %}>Transport</option>
+            <option value="Bills" {% if selected_category == 'Bills' %}selected{% endif %}>Bills</option>
+            <option value="Shopping" {% if selected_category == 'Shopping' %}selected{% endif %}>Shopping</option>
+            <option value="Entertainment" {% if selected_category == 'Entertainment' %}selected{% endif %}>Entertainment</option>
+            <option value="Health" {% if selected_category == 'Health' %}selected{% endif %}>Health</option>
+            <option value="Education" {% if selected_category == 'Education' %}selected{% endif %}>Education</option>
+            <option value="Other" {% if selected_category == 'Other' %}selected{% endif %}>Other</option>
+        </select>
 
-        <label for="description" style="display:block;margin-bottom:6px;color:#333;font-weight:bold;">Description</label>
-        <input type="text" id="description" name="description" value="{{ request.form.get('description', transaction.description or '') }}" style="width:100%;padding:10px;margin-bottom:10px;border-radius:5px;border:1px solid #ccc;box-sizing:border-box;">
+        <label for="description" style="display:block;margin-bottom:8px;color:#cbd5e1;font-weight:600;">Description</label>
+        <input type="text" id="description" name="description" value="{{ request.form.get('description', transaction.description or '') }}" style="width:100%;padding:12px;margin-bottom:14px;border-radius:8px;border:1px solid #334155;background:#1e293b;color:white;box-sizing:border-box;outline:none;transition:all 0.2s ease;">
 
-        <label for="tags" style="display:block;margin-bottom:6px;color:#333;font-weight:bold;">Tags</label>
-        <input type="text" id="tags" name="tags" value="{{ request.form.get('tags', transaction.tags or '') }}" placeholder="Enter tags (comma separated)" style="width:100%;padding:10px;margin-bottom:20px;border-radius:5px;border:1px solid #ccc;box-sizing:border-box;">
+        <label for="tags" style="display:block;margin-bottom:8px;color:#cbd5e1;font-weight:600;">Tags</label>
+        <input type="text" id="tags" name="tags" value="{{ request.form.get('tags', transaction.tags or '') }}" placeholder="Enter tags (comma separated)" style="width:100%;padding:12px;margin-bottom:24px;border-radius:8px;border:1px solid #334155;background:#1e293b;color:white;box-sizing:border-box;outline:none;transition:all 0.2s ease;">
 
-        <button type="submit" style="width:100%;background:#2ecc71;color:white;padding:10px;border:none;border-radius:5px;cursor:pointer;font-size:16px;">Update Transaction</button>
+        <button type="submit" style="width:100%;background:#22c55e;color:black;padding:12px;border:none;border-radius:8px;cursor:pointer;font-size:14px;font-weight:600;transition:all 0.2s ease;box-shadow:0 12px 24px rgba(34,197,94,0.18);">Update Transaction</button>
     </form>
 
-    <div style="text-align:center;margin-top:15px;">
-        <a href="/" style="color:#2ecc71;text-decoration:none;">Back to Dashboard</a>
+    <div style="text-align:center;margin-top:18px;">
+        <a href="/" style="color:#22c55e;text-decoration:none;transition:all 0.2s ease;">Back to Dashboard</a>
     </div>
 </div>
 {% endblock %}

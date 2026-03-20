@@ -94,7 +94,7 @@ class FinanceTrackerTestCase(unittest.TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertTrue(response.headers["Location"].endswith("/login"))
 
-        for path in ["/add", "/chart", "/download_report", "/edit/1", "/delete/1"]:
+        for path in ["/add", "/about", "/chart", "/download_report", "/edit/1", "/delete/1"]:
             route_response = self.client.get(path, follow_redirects=False)
             self.assertEqual(route_response.status_code, 302, path)
             self.assertTrue(route_response.headers["Location"].endswith("/login"), path)
@@ -154,6 +154,17 @@ class FinanceTrackerTestCase(unittest.TestCase):
         self.register()
         self.login()
 
+        add_page = self.client.get("/add", follow_redirects=True)
+        add_page_text = add_page.get_data(as_text=True)
+        self.assertIn(datetime.now().strftime("%Y-%m-%d"), add_page_text)
+        self.assertIn('name="type" value="expense"', add_page_text)
+        self.assertIn('name="category"', add_page_text)
+
+        income_add_page = self.client.get("/add?type=income", follow_redirects=True)
+        income_page_text = income_add_page.get_data(as_text=True)
+        self.assertIn('name="type" value="income"', income_page_text)
+        self.assertNotIn('id="category"', income_page_text)
+
         invalid_amount = self.client.post(
             "/add",
             data={"amount": "-10", "type": "expense", "category": "Food"},
@@ -167,6 +178,13 @@ class FinanceTrackerTestCase(unittest.TestCase):
             follow_redirects=True,
         )
         self.assertIn("Type must be income or expense", invalid_type.get_data(as_text=True))
+
+        missing_category = self.client.post(
+            "/add",
+            data={"amount": "10", "type": "expense", "category": ""},
+            follow_redirects=True,
+        )
+        self.assertIn("Category is required", missing_category.get_data(as_text=True))
 
         success = self.client.post(
             "/add",
@@ -190,6 +208,26 @@ class FinanceTrackerTestCase(unittest.TestCase):
             self.assertEqual(transaction.tags, "weekly, essentials")
             self.assertEqual(transaction.user_id, User.query.filter_by(username="alice").first().id)
             self.assertEqual(transaction.date.strftime("%Y-%m-%d"), "2026-03-20")
+
+        income_success = self.client.post(
+            "/add",
+            data={
+                "date": "2026-03-21",
+                "amount": "5000",
+                "type": "income",
+                "description": "Salary credit",
+                "tags": "monthly",
+            },
+            follow_redirects=True,
+        )
+        self.assertIn("Transaction saved successfully", income_success.get_data(as_text=True))
+
+        with app.app_context():
+            income_transaction = (
+                Transaction.query.filter_by(type="income").order_by(Transaction.id.desc()).first()
+            )
+            self.assertIsNotNone(income_transaction)
+            self.assertEqual(income_transaction.category, "Income")
 
     def test_dashboard_isolation_filters_savings_and_budget(self):
         user_id = self.create_user("alice")
@@ -354,7 +392,7 @@ class FinanceTrackerTestCase(unittest.TestCase):
 
         dashboard = self.client.get("/", follow_redirects=True)
         self.assertEqual(dashboard.status_code, 200)
-        self.assertIn("No transactions added yet", dashboard.get_data(as_text=True))
+        self.assertIn("No transactions yet", dashboard.get_data(as_text=True))
 
         empty_chart = self.client.get("/chart", follow_redirects=True)
         self.assertEqual(empty_chart.status_code, 200)
@@ -384,6 +422,21 @@ class FinanceTrackerTestCase(unittest.TestCase):
         with app.app_context():
             budget = Budget.query.one()
             self.assertEqual(budget.amount, 5000)
+
+    def test_about_page_requires_login_and_uses_new_branding(self):
+        redirect_response = self.client.get("/about", follow_redirects=False)
+        self.assertEqual(redirect_response.status_code, 302)
+        self.assertTrue(redirect_response.headers["Location"].endswith("/login"))
+
+        self.register()
+        self.login()
+
+        response = self.client.get("/about", follow_redirects=True)
+        page = response.get_data(as_text=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("About ExpenseStats", page)
+        self.assertIn("ExpenseStats", page)
+        self.assertIn("Your spending, decoded.", page)
 
     def test_legacy_plain_text_password_is_upgraded_on_login(self):
         self.create_user("legacy-user", password="legacy-pass-1")
