@@ -8,6 +8,9 @@
     <p style="text-align:center;color:#666;margin-bottom:25px;">Enter a new income or expense record.</p>
 
     <form method="POST">
+        <label for="date" style="display:block;margin-bottom:6px;color:#333;font-weight:bold;">Date</label>
+        <input type="date" id="date" name="date" style="width:100%;padding:10px;margin-bottom:10px;border-radius:5px;border:1px solid #ccc;box-sizing:border-box;">
+
         <label for="amount" style="display:block;margin-bottom:6px;color:#333;font-weight:bold;">Amount</label>
         <input type="number" id="amount" name="amount" step="0.01" min="0" required style="width:100%;padding:10px;margin-bottom:10px;border-radius:5px;border:1px solid #ccc;box-sizing:border-box;">
 

@@ -19,6 +19,34 @@
             <h4 style="margin:0 0 10px 0;">Balance</h4>
             <h2 style="margin:0;">&#8377;{{ '%.2f'|format(balance) }}</h2>
         </div>
+
+        <div style="background:white;color:#333;padding:20px;border-radius:12px;margin-top:15px;box-shadow:0 4px 10px rgba(0,0,0,0.1);">
+            <h4 style="margin:0 0 10px 0;">Monthly Budget</h4>
+            <p style="margin:0 0 15px 0;color:#666;">
+                {% if budget %}
+                Current budget: <strong>&#8377;{{ '%.2f'|format(budget.amount) }}</strong>
+                {% else %}
+                Set your monthly budget to track spending.
+                {% endif %}
+            </p>
+
+            <form method="POST" action="/set_budget">
+                <input type="hidden" name="filter_date" value="{{ filter_date }}">
+                <input type="hidden" name="filter_month" value="{{ filter_month }}">
+                <input type="number" name="budget_amount" step="0.01" min="0" value="{{ '%.2f'|format(budget.amount) if budget else '' }}" placeholder="Enter monthly budget" style="width:100%;padding:10px;border-radius:6px;border:1px solid #ccc;box-sizing:border-box;margin-bottom:10px;">
+                <button type="submit" style="width:100%;background:#2ecc71;color:white;padding:10px;border:none;border-radius:6px;cursor:pointer;">Save Budget</button>
+            </form>
+
+            {% if remaining_budget is not none %}
+            <div style="margin-top:15px;padding:12px;border-radius:8px;background:{% if budget_exceeded %}#fdecea{% else %}#ecf9f1{% endif %};color:{% if budget_exceeded %}#e74c3c{% else %}#2e7d32{% endif %};">
+                <strong>Remaining Budget:</strong>
+                &#8377;{{ '%.2f'|format(remaining_budget) }}
+            </div>
+            {% if budget_exceeded %}
+            <p style="margin:10px 0 0 0;color:#e74c3c;font-weight:bold;">Warning: You have exceeded your budget.</p>
+            {% endif %}
+            {% endif %}
+        </div>
     </div>
 
     <div style="flex:1;min-width:300px;background:white;padding:20px;border-radius:12px;box-shadow:0 4px 10px rgba(0,0,0,0.1);text-align:center;">
@@ -32,12 +60,31 @@
 </div>
 
 <div style="background:white;margin-top:30px;padding:20px;border-radius:12px;box-shadow:0 4px 10px rgba(0,0,0,0.1);">
+    <h3 style="margin-top:0;">Filter Transactions</h3>
+    <form method="GET" style="display:flex;gap:15px;flex-wrap:wrap;align-items:flex-end;">
+        <div style="flex:1;min-width:220px;">
+            <label for="filter_date" style="display:block;margin-bottom:6px;color:#333;font-weight:bold;">Filter by Date</label>
+            <input type="date" id="filter_date" name="filter_date" value="{{ filter_date }}" style="width:100%;padding:10px;border-radius:5px;border:1px solid #ccc;box-sizing:border-box;">
+        </div>
+        <div style="flex:1;min-width:220px;">
+            <label for="filter_month" style="display:block;margin-bottom:6px;color:#333;font-weight:bold;">Filter by Month</label>
+            <input type="month" id="filter_month" name="filter_month" value="{{ filter_month }}" style="width:100%;padding:10px;border-radius:5px;border:1px solid #ccc;box-sizing:border-box;">
+        </div>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;">
+            <button type="submit" style="background:#2ecc71;color:white;padding:10px 16px;border:none;border-radius:6px;cursor:pointer;">Apply Filter</button>
+            <a href="/" style="display:inline-block;background:#34495e;color:white;padding:10px 16px;border-radius:6px;text-decoration:none;">Clear</a>
+        </div>
+    </form>
+</div>
+
+<div style="background:white;margin-top:30px;padding:20px;border-radius:12px;box-shadow:0 4px 10px rgba(0,0,0,0.1);">
     <h3 style="margin-top:0;">Transactions</h3>
 
     {% if transactions %}
     <div style="overflow-x:auto;">
         <table style="width:100%;border-collapse:collapse;margin-top:10px;">
             <tr style="background:#f1f1f1;">
+                <th style="padding:10px;border-bottom:1px solid #ddd;text-align:left;">Date</th>
                 <th style="padding:10px;border-bottom:1px solid #ddd;text-align:left;">Amount</th>
                 <th style="padding:10px;border-bottom:1px solid #ddd;text-align:left;">Type</th>
                 <th style="padding:10px;border-bottom:1px solid #ddd;text-align:left;">Category</th>
@@ -46,6 +93,7 @@
 
             {% for t in transactions %}
             <tr style="background:{% if loop.index0 % 2 == 0 %}#ffffff{% else %}#fafafa{% endif %};">
+                <td style="padding:10px;border-bottom:1px solid #eee;">{{ t.date.strftime('%Y-%m-%d') if t.date else '-' }}</td>
                 <td style="padding:10px;border-bottom:1px solid #eee;">&#8377;{{ '%.2f'|format(t.amount) }}</td>
                 <td style="padding:10px;border-bottom:1px solid #eee;">{{ t.type }}</td>
                 <td style="padding:10px;border-bottom:1px solid #eee;">{{ t.category or 'Miscellaneous' }}</td>

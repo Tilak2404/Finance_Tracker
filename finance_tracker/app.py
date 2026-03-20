@@ -1,8 +1,11 @@
 import os
+from datetime import datetime
 
 import matplotlib
 from flask import Flask, redirect, render_template, request, session
 from flask_sqlalchemy import SQLAlchemy
+from sqlalchemy import func
+from werkzeug.security import check_password_hash, generate_password_hash
 
 matplotlib.use("Agg")
 
@@ -18,7 +21,13 @@ db = SQLAlchemy(app)
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(100), unique=True, nullable=False)
-    password = db.Column(db.String(100), nullable=False)
+    password = db.Column(db.String(255), nullable=False)
+
+
+class Budget(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, unique=True)
+    amount = db.Column(db.Float, nullable=False)
 
 
 class Transaction(db.Model):
@@ -27,6 +36,8 @@ class Transaction(db.Model):
     type = db.Column(db.String(20), nullable=False)
     category = db.Column(db.String(100))
     description = db.Column(db.String(255))
+    user_id = db.Column(db.Integer)
+    date = db.Column(db.DateTime, default=datetime.utcnow)
 
 
 def generate_donut_chart(expense_transactions, balance):
@@ -63,12 +74,7 @@ def generate_donut_chart(expense_transactions, balance):
     if not values:
         plt.pie([1], colors=["#dfe6e9"], startangle=90)
     else:
-        plt.pie(
-            values,
-            labels=labels,
-            autopct="%1.1f%%",
-            startangle=90,
-        )
+        plt.pie(values, labels=labels, autopct="%1.1f%%", startangle=90)
 
     centre_circle = plt.Circle((0, 0), 0.70, fc="white")
     fig = plt.gcf()
@@ -76,7 +82,7 @@ def generate_donut_chart(expense_transactions, balance):
     plt.text(
         0,
         0,
-        f"₹{balance:.2f}",
+        f"\u20b9{balance:.2f}",
         horizontalalignment="center",
         verticalalignment="center",
         fontsize=16,
@@ -109,7 +115,8 @@ def register():
             error = "Username already exists."
             return render_template("register.html", error=error)
 
-        user = User(username=username, password=password)
+        hashed_password = generate_password_hash(password)
+        user = User(username=username, password=hashed_password)
         db.session.add(user)
         db.session.commit()
         return redirect("/login")
@@ -126,9 +133,9 @@ def login():
     if request.method == "POST":
         username = request.form["username"]
         password = request.form["password"]
-        user = User.query.filter_by(username=username, password=password).first()
+        user = User.query.filter_by(username=username).first()
 
-        if user:
+        if user and check_password_hash(user.password, password):
             session["user_id"] = user.id
             return redirect("/")
 
@@ -144,12 +151,63 @@ def logout():
     return redirect("/login")
 
 
+@app.route("/set_budget", methods=["POST"])
+def set_budget():
+    if "user_id" not in session:
+        return redirect("/login")
+
+    budget_amount = request.form.get("budget_amount", "").strip()
+    try:
+        amount = float(budget_amount)
+    except ValueError:
+        amount = 0.0
+
+    budget = Budget.query.filter_by(user_id=session["user_id"]).first()
+    if budget:
+        budget.amount = amount
+    else:
+        budget = Budget(user_id=session["user_id"], amount=amount)
+        db.session.add(budget)
+
+    db.session.commit()
+
+    filter_date = request.form.get("filter_date", "")
+    filter_month = request.form.get("filter_month", "")
+    if filter_date:
+        return redirect(f"/?filter_date={filter_date}")
+    if filter_month:
+        return redirect(f"/?filter_month={filter_month}")
+    return redirect("/")
+
+
 @app.route("/")
 def index():
     if "user_id" not in session:
         return redirect("/login")
 
-    transactions = Transaction.query.all()
+    filter_date = request.args.get("filter_date", "")
+    filter_month = request.args.get("filter_month", "")
+
+    query = Transaction.query.filter_by(user_id=session["user_id"])
+
+    if filter_date:
+        try:
+            selected_date = datetime.strptime(filter_date, "%Y-%m-%d").date()
+            query = query.filter(func.date(Transaction.date) == selected_date.isoformat())
+        except ValueError:
+            filter_date = ""
+    elif filter_month:
+        try:
+            month_start = datetime.strptime(filter_month, "%Y-%m")
+            if month_start.month == 12:
+                month_end = datetime(month_start.year + 1, 1, 1)
+            else:
+                month_end = datetime(month_start.year, month_start.month + 1, 1)
+            query = query.filter(Transaction.date >= month_start, Transaction.date < month_end)
+        except ValueError:
+            filter_month = ""
+
+    transactions = query.order_by(Transaction.date.desc()).all()
     expense_transactions = [
         transaction for transaction in transactions if transaction.type == "expense"
     ]
@@ -160,6 +218,9 @@ def index():
         transaction.amount for transaction in transactions if transaction.type == "expense"
     )
     balance = total_income - total_expense
+    budget = Budget.query.filter_by(user_id=session["user_id"]).first()
+    remaining_budget = budget.amount - total_expense if budget else None
+    budget_exceeded = budget is not None and total_expense > budget.amount
     generate_donut_chart(expense_transactions, balance)
 
     return render_template(
@@ -168,6 +229,11 @@ def index():
         total_income=total_income,
         total_expense=total_expense,
         balance=balance,
+        filter_date=filter_date,
+        filter_month=filter_month,
+        budget=budget,
+        remaining_budget=remaining_budget,
+        budget_exceeded=budget_exceeded,
     )
 
 
@@ -177,11 +243,23 @@ def add_transaction():
         return redirect("/login")
 
     if request.method == "POST":
+        transaction_date = request.form.get("date", "")
+        try:
+            parsed_date = (
+                datetime.strptime(transaction_date, "%Y-%m-%d")
+                if transaction_date
+                else datetime.utcnow()
+            )
+        except ValueError:
+            parsed_date = datetime.utcnow()
+
         transaction = Transaction(
             amount=float(request.form["amount"]),
             type=request.form["type"],
             category=request.form.get("category", ""),
             description=request.form.get("description", ""),
+            user_id=session["user_id"],
+            date=parsed_date,
         )
         db.session.add(transaction)
         db.session.commit()
@@ -195,7 +273,7 @@ def delete_transaction(id):
     if "user_id" not in session:
         return redirect("/login")
 
-    transaction = Transaction.query.get(id)
+    transaction = Transaction.query.filter_by(id=id, user_id=session["user_id"]).first()
     if transaction:
         db.session.delete(transaction)
         db.session.commit()
@@ -207,11 +285,18 @@ def edit_transaction(id):
     if "user_id" not in session:
         return redirect("/login")
 
-    transaction = Transaction.query.get(id)
+    transaction = Transaction.query.filter_by(id=id, user_id=session["user_id"]).first()
     if not transaction:
         return redirect("/")
 
     if request.method == "POST":
+        transaction_date = request.form.get("date", "")
+        try:
+            if transaction_date:
+                transaction.date = datetime.strptime(transaction_date, "%Y-%m-%d")
+        except ValueError:
+            pass
+
         transaction.amount = float(request.form["amount"])
         transaction.type = request.form["type"]
         transaction.category = request.form.get("category", "")
@@ -227,8 +312,10 @@ def chart():
     if "user_id" not in session:
         return redirect("/login")
 
-    transactions = Transaction.query.all()
-    expense_transactions = Transaction.query.filter_by(type="expense").all()
+    transactions = Transaction.query.filter_by(user_id=session["user_id"]).all()
+    expense_transactions = Transaction.query.filter_by(
+        user_id=session["user_id"], type="expense"
+    ).all()
     total_income = sum(
         transaction.amount for transaction in transactions if transaction.type == "income"
     )
