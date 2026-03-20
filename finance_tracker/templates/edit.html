@@ -24,7 +24,10 @@
         <input type="text" id="category" name="category" value="{{ request.form.get('category', transaction.category or '') }}" style="width:100%;padding:10px;margin-bottom:10px;border-radius:5px;border:1px solid #ccc;box-sizing:border-box;">
 
         <label for="description" style="display:block;margin-bottom:6px;color:#333;font-weight:bold;">Description</label>
-        <input type="text" id="description" name="description" value="{{ request.form.get('description', transaction.description or '') }}" style="width:100%;padding:10px;margin-bottom:20px;border-radius:5px;border:1px solid #ccc;box-sizing:border-box;">
+        <input type="text" id="description" name="description" value="{{ request.form.get('description', transaction.description or '') }}" style="width:100%;padding:10px;margin-bottom:10px;border-radius:5px;border:1px solid #ccc;box-sizing:border-box;">
+
+        <label for="tags" style="display:block;margin-bottom:6px;color:#333;font-weight:bold;">Tags</label>
+        <input type="text" id="tags" name="tags" value="{{ request.form.get('tags', transaction.tags or '') }}" placeholder="Enter tags (comma separated)" style="width:100%;padding:10px;margin-bottom:20px;border-radius:5px;border:1px solid #ccc;box-sizing:border-box;">
 
         <button type="submit" style="width:100%;background:#2ecc71;color:white;padding:10px;border:none;border-radius:5px;cursor:pointer;font-size:16px;">Update Transaction</button>
     </form>

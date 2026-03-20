@@ -107,6 +107,7 @@
                 <th style="padding:10px;border-bottom:1px solid #ddd;text-align:left;">Amount</th>
                 <th style="padding:10px;border-bottom:1px solid #ddd;text-align:left;">Type</th>
                 <th style="padding:10px;border-bottom:1px solid #ddd;text-align:left;">Category</th>
+                <th style="padding:10px;border-bottom:1px solid #ddd;text-align:left;">Tags</th>
                 <th style="padding:10px;border-bottom:1px solid #ddd;text-align:left;">Actions</th>
             </tr>
 
@@ -116,6 +117,17 @@
                 <td style="padding:10px;border-bottom:1px solid #eee;">&#8377;{{ '%.2f'|format(t.amount) }}</td>
                 <td style="padding:10px;border-bottom:1px solid #eee;">{{ t.type }}</td>
                 <td style="padding:10px;border-bottom:1px solid #eee;">{{ t.category or 'Miscellaneous' }}</td>
+                <td style="padding:10px;border-bottom:1px solid #eee;">
+                    {% if t.tags %}
+                        {% for tag in t.tags.split(',') %}
+                            {% if tag.strip() %}
+                            <span style="display:inline-block;background:#eaf7ee;color:#2ecc71;padding:4px 8px;border-radius:999px;font-size:12px;margin:0 6px 6px 0;">{{ tag.strip() }}</span>
+                            {% endif %}
+                        {% endfor %}
+                    {% else %}
+                    <span style="color:#888;">-</span>
+                    {% endif %}
+                </td>
                 <td style="padding:10px;border-bottom:1px solid #eee;white-space:nowrap;">
                     <a href="/edit/{{ t.id }}" style="background:#3498db;color:white;padding:5px 10px;border-radius:5px;text-decoration:none;display:inline-block;">Edit</a>
                     <a href="/delete/{{ t.id }}" style="background:#e74c3c;color:white;padding:5px 10px;border-radius:5px;text-decoration:none;margin-left:5px;display:inline-block;">Delete</a>

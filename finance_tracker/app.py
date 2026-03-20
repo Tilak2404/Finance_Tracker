@@ -43,6 +43,7 @@ class Transaction(db.Model):
     type = db.Column(db.String(20), nullable=False)
     category = db.Column(db.String(100))
     description = db.Column(db.String(255))
+    tags = db.Column(db.String)
     user_id = db.Column(db.Integer)
     date = db.Column(db.DateTime, default=datetime.utcnow)
 
@@ -52,6 +53,7 @@ def parse_transaction_form(form, default_date=None):
     transaction_type = form.get("type", "").strip()
     category = form.get("category", "").strip()
     description = form.get("description", "").strip()
+    tags = form.get("tags", "").strip()
     date_text = form.get("date", "").strip()
 
     if not amount_text or not transaction_type:
@@ -80,6 +82,7 @@ def parse_transaction_form(form, default_date=None):
         "type": transaction_type,
         "category": category,
         "description": description,
+        "tags": tags,
         "date": parsed_date,
     }, None
 
@@ -488,6 +491,7 @@ def add_transaction():
                 type=transaction_data["type"],
                 category=transaction_data["category"],
                 description=transaction_data["description"],
+                tags=transaction_data["tags"],
                 user_id=session["user_id"],
                 date=transaction_data["date"],
             )
@@ -551,6 +555,7 @@ def edit_transaction(id):
             transaction.type = transaction_data["type"]
             transaction.category = transaction_data["category"]
             transaction.description = transaction_data["description"]
+            transaction.tags = transaction_data["tags"]
             transaction.date = transaction_data["date"]
             db.session.commit()
         except SQLAlchemyError:
