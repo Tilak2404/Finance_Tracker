@@ -1,9 +1,13 @@
 import os
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import matplotlib
-from flask import Flask, redirect, render_template, request, session
+from flask import Flask, redirect, render_template, request, send_file, session
 from flask_sqlalchemy import SQLAlchemy
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import letter
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 from sqlalchemy import func
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -101,6 +105,133 @@ def generate_donut_chart(expense_transactions, balance):
     plt.close()
 
 
+def generate_trend_chart(expense_transactions):
+    static_folder = os.path.join(app.root_path, "static")
+    os.makedirs(static_folder, exist_ok=True)
+    trend_path = os.path.join(static_folder, "trend.png")
+
+    expense_by_date = {}
+    for transaction in expense_transactions:
+        if transaction.date:
+            date_key = transaction.date.strftime("%Y-%m-%d")
+        else:
+            date_key = "Unknown"
+        expense_by_date[date_key] = expense_by_date.get(date_key, 0) + transaction.amount
+
+    dates = sorted(expense_by_date.keys())
+    values = [expense_by_date[date] for date in dates]
+
+    plt.figure(figsize=(8, 4))
+    if not values:
+        plt.text(0.5, 0.5, "No Expense Data", ha="center", va="center", fontsize=12)
+        plt.axis("off")
+    else:
+        plt.plot(dates, values, marker="o", color="#2ecc71", linewidth=2)
+        plt.fill_between(dates, values, color="#2ecc71", alpha=0.12)
+        plt.xlabel("Date")
+        plt.ylabel("Expenses")
+        plt.title("Expense Trend Over Time")
+        plt.xticks(rotation=45, ha="right")
+        plt.grid(axis="y", linestyle="--", alpha=0.4)
+        plt.tight_layout()
+
+    plt.savefig(trend_path, bbox_inches="tight")
+    plt.close()
+
+
+def build_insights(filtered_expense_transactions, all_expense_transactions):
+    insights = []
+
+    if filtered_expense_transactions:
+        category_totals = {}
+        for transaction in filtered_expense_transactions:
+            category_name = (transaction.category or "").strip().title() or "Miscellaneous"
+            category_totals[category_name] = category_totals.get(category_name, 0) + transaction.amount
+
+        top_category = max(category_totals, key=category_totals.get)
+        insights.append(f"You spent most on {top_category}.")
+    else:
+        insights.append("Add some expense transactions to unlock spending insights.")
+
+    today = datetime.utcnow().date()
+    start_of_this_week = today - timedelta(days=today.weekday())
+    start_of_next_week = start_of_this_week + timedelta(days=7)
+    start_of_last_week = start_of_this_week - timedelta(days=7)
+
+    this_week_total = sum(
+        transaction.amount
+        for transaction in all_expense_transactions
+        if transaction.date and start_of_this_week <= transaction.date.date() < start_of_next_week
+    )
+    last_week_total = sum(
+        transaction.amount
+        for transaction in all_expense_transactions
+        if transaction.date and start_of_last_week <= transaction.date.date() < start_of_this_week
+    )
+
+    if this_week_total > 0 and last_week_total > 0:
+        if this_week_total > last_week_total:
+            insights.append(
+                f"Your spending is up by \u20b9{this_week_total - last_week_total:.2f} compared with last week."
+            )
+        elif this_week_total < last_week_total:
+            insights.append(
+                f"Your spending is down by \u20b9{last_week_total - this_week_total:.2f} compared with last week."
+            )
+        else:
+            insights.append("Your spending matches last week exactly.")
+    elif this_week_total > 0 and last_week_total == 0:
+        insights.append(f"You have spent \u20b9{this_week_total:.2f} so far this week.")
+
+    return insights
+
+
+def generate_pdf_report(transactions, total_income, total_expense, balance):
+    report_path = os.path.join(app.root_path, "report.pdf")
+    document = SimpleDocTemplate(report_path, pagesize=letter)
+    styles = getSampleStyleSheet()
+    elements = []
+
+    elements.append(Paragraph("Finance Report", styles["Title"]))
+    elements.append(Spacer(1, 12))
+    elements.append(Paragraph(f"Total Income: Rs {total_income:.2f}", styles["Normal"]))
+    elements.append(Paragraph(f"Total Expense: Rs {total_expense:.2f}", styles["Normal"]))
+    elements.append(Paragraph(f"Balance: Rs {balance:.2f}", styles["Normal"]))
+    elements.append(Spacer(1, 16))
+
+    table_data = [["Amount", "Category", "Type"]]
+    for transaction in transactions:
+        table_data.append(
+            [
+                f"Rs {transaction.amount:.2f}",
+                transaction.category or "Miscellaneous",
+                transaction.type.title(),
+            ]
+        )
+
+    if len(table_data) == 1:
+        elements.append(Paragraph("No transactions available.", styles["Normal"]))
+    else:
+        table = Table(table_data, colWidths=[120, 180, 120])
+        table.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.black),
+                    ("GRID", (0, 0), (-1, -1), 1, colors.grey),
+                    ("ALIGN", (0, 0), (-1, -1), "LEFT"),
+                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                    ("BOTTOMPADDING", (0, 0), (-1, 0), 8),
+                    ("BACKGROUND", (0, 1), (-1, -1), colors.whitesmoke),
+                ]
+            )
+        )
+        elements.append(table)
+
+    document.build(elements)
+    return report_path
+
+
 @app.route("/register", methods=["GET", "POST"])
 def register():
     if "user_id" in session:
@@ -185,6 +316,9 @@ def index():
     if "user_id" not in session:
         return redirect("/login")
 
+    all_expense_transactions = Transaction.query.filter_by(
+        user_id=session["user_id"], type="expense"
+    ).all()
     filter_date = request.args.get("filter_date", "")
     filter_month = request.args.get("filter_month", "")
 
@@ -218,10 +352,17 @@ def index():
         transaction.amount for transaction in transactions if transaction.type == "expense"
     )
     balance = total_income - total_expense
+    savings = total_income - total_expense
+    if total_income > 0:
+        savings_rate = round((savings / total_income) * 100, 2)
+    else:
+        savings_rate = 0
     budget = Budget.query.filter_by(user_id=session["user_id"]).first()
     remaining_budget = budget.amount - total_expense if budget else None
     budget_exceeded = budget is not None and total_expense > budget.amount
+    insights = build_insights(expense_transactions, all_expense_transactions)
     generate_donut_chart(expense_transactions, balance)
+    generate_trend_chart(expense_transactions)
 
     return render_template(
         "index.html",
@@ -229,11 +370,13 @@ def index():
         total_income=total_income,
         total_expense=total_expense,
         balance=balance,
+        savings_rate=savings_rate,
         filter_date=filter_date,
         filter_month=filter_month,
         budget=budget,
         remaining_budget=remaining_budget,
         budget_exceeded=budget_exceeded,
+        insights=insights,
     )
 
 
@@ -324,8 +467,31 @@ def chart():
     )
     balance = total_income - total_expense
     generate_donut_chart(expense_transactions, balance)
+    generate_trend_chart(expense_transactions)
 
     return render_template("chart.html")
+
+
+@app.route("/download_report")
+def download_report():
+    if "user_id" not in session:
+        return redirect("/login")
+
+    transactions = (
+        Transaction.query.filter_by(user_id=session["user_id"])
+        .order_by(Transaction.date.desc())
+        .all()
+    )
+    total_income = sum(
+        transaction.amount for transaction in transactions if transaction.type == "income"
+    )
+    total_expense = sum(
+        transaction.amount for transaction in transactions if transaction.type == "expense"
+    )
+    balance = total_income - total_expense
+
+    report_path = generate_pdf_report(transactions, total_income, total_expense, balance)
+    return send_file(report_path, as_attachment=True, download_name="report.pdf")
 
 
 if __name__ == "__main__":

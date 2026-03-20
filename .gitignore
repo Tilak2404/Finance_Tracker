@@ -2,3 +2,5 @@ __pycache__/
 *.pyc
 finance_tracker/instance/
 finance_tracker/static/chart.png
+finance_tracker/static/trend.png
+finance_tracker/report.pdf
