@@ -29,7 +29,7 @@ class Transaction(db.Model):
     description = db.Column(db.String(255))
 
 
-def generate_donut_chart(expense_transactions):
+def generate_donut_chart(expense_transactions, balance):
     static_folder = os.path.join(app.root_path, "static")
     os.makedirs(static_folder, exist_ok=True)
     chart_path = os.path.join(static_folder, "chart.png")
@@ -62,7 +62,6 @@ def generate_donut_chart(expense_transactions):
     plt.figure(figsize=(6, 6))
     if not values:
         plt.pie([1], colors=["#dfe6e9"], startangle=90)
-        plt.text(0, 0, "No Expenses", ha="center", va="center", fontsize=12)
     else:
         plt.pie(
             values,
@@ -74,6 +73,22 @@ def generate_donut_chart(expense_transactions):
     centre_circle = plt.Circle((0, 0), 0.70, fc="white")
     fig = plt.gcf()
     fig.gca().add_artist(centre_circle)
+    plt.text(
+        0,
+        0,
+        f"₹{balance:.2f}",
+        horizontalalignment="center",
+        verticalalignment="center",
+        fontsize=16,
+        fontweight="bold",
+    )
+    plt.text(
+        0,
+        -0.2,
+        "Balance",
+        horizontalalignment="center",
+        fontsize=10,
+    )
     plt.axis("equal")
     plt.title("Expenses by Category")
     plt.savefig(chart_path, bbox_inches="tight")
@@ -145,7 +160,7 @@ def index():
         transaction.amount for transaction in transactions if transaction.type == "expense"
     )
     balance = total_income - total_expense
-    generate_donut_chart(expense_transactions)
+    generate_donut_chart(expense_transactions, balance)
 
     return render_template(
         "index.html",
@@ -212,8 +227,16 @@ def chart():
     if "user_id" not in session:
         return redirect("/login")
 
+    transactions = Transaction.query.all()
     expense_transactions = Transaction.query.filter_by(type="expense").all()
-    generate_donut_chart(expense_transactions)
+    total_income = sum(
+        transaction.amount for transaction in transactions if transaction.type == "income"
+    )
+    total_expense = sum(
+        transaction.amount for transaction in transactions if transaction.type == "expense"
+    )
+    balance = total_income - total_expense
+    generate_donut_chart(expense_transactions, balance)
 
     return render_template("chart.html")
 
