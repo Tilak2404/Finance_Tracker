@@ -3,77 +3,31 @@
 {% block title %}Add Transaction | Finance Tracker{% endblock %}
 
 {% block content %}
-<header class="topbar">
-    <a class="brand" href="/">
-        <span class="brand-mark">FT</span>
-        <span class="brand-copy">
-            <strong>Finance Tracker</strong>
-            <span>Personal cash flow dashboard</span>
-        </span>
-    </a>
+<div class="card form-card">
+    <h1 class="page-title center-text">Add Transaction</h1>
+    <p class="page-subtitle center-text">Enter the transaction details below.</p>
 
-    <div class="button-row">
-        <a class="btn btn-soft" href="/">Back to Dashboard</a>
-        <a class="btn btn-warm" href="/logout">Logout</a>
+    <form method="POST">
+        <label for="amount">Amount</label>
+        <input type="number" id="amount" name="amount" step="0.01" min="0" required>
+
+        <label for="type">Type</label>
+        <select id="type" name="type" required>
+            <option value="income">Income</option>
+            <option value="expense">Expense</option>
+        </select>
+
+        <label for="category">Category</label>
+        <input type="text" id="category" name="category" placeholder="Salary, Food, Rent">
+
+        <label for="description">Description</label>
+        <input type="text" id="description" name="description" placeholder="Optional description">
+
+        <button type="submit">Save Transaction</button>
+    </form>
+
+    <div class="helper-links">
+        <a href="/">Back to Dashboard</a>
     </div>
-</header>
-
-<section class="form-shell">
-    <aside class="glass-card side-copy">
-        <p class="eyebrow">New Entry</p>
-        <h1>Add a fresh transaction in seconds.</h1>
-        <p>Capture new income or log an expense while it is still top of mind. A quick update keeps the dashboard honest.</p>
-
-        <div class="stack-card">
-            <div class="mini-card">
-                <span>Amount and type</span>
-                <strong>Core</strong>
-            </div>
-            <div class="mini-card">
-                <span>Category label</span>
-                <strong>Context</strong>
-            </div>
-            <div class="mini-card">
-                <span>Description note</span>
-                <strong>Memory</strong>
-            </div>
-        </div>
-    </aside>
-
-    <section class="glass-card form-card">
-        <p class="eyebrow">Transaction Form</p>
-        <h1>Add Transaction</h1>
-        <p>Fill in the details below and save the entry directly into your ledger.</p>
-
-        <form method="POST" class="form-grid">
-            <div class="field-group">
-                <label for="amount">Amount</label>
-                <input type="number" id="amount" name="amount" step="0.01" min="0" placeholder="0.00" required>
-            </div>
-
-            <div class="field-group">
-                <label for="type">Type</label>
-                <select id="type" name="type" required>
-                    <option value="income">Income</option>
-                    <option value="expense">Expense</option>
-                </select>
-            </div>
-
-            <div class="field-group">
-                <label for="category">Category</label>
-                <input type="text" id="category" name="category" placeholder="Salary, Groceries, Rent">
-            </div>
-
-            <div class="field-group">
-                <label for="description">Description</label>
-                <input type="text" id="description" name="description" placeholder="Short note about this transaction">
-            </div>
-
-            <div class="span-2 form-actions">
-                <button class="btn btn-primary" type="submit">Save Transaction</button>
-                <a class="btn btn-soft" href="/">Cancel</a>
-            </div>
-        </form>
-    </section>
-</section>
+</div>
 {% endblock %}
