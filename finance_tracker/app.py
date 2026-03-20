@@ -2,13 +2,14 @@ import os
 from datetime import datetime, timedelta
 
 import matplotlib
-from flask import Flask, redirect, render_template, request, send_file, session
+from flask import Flask, flash, redirect, render_template, request, send_file, session
 from flask_sqlalchemy import SQLAlchemy
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 from sqlalchemy import func
+from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.security import check_password_hash, generate_password_hash
 
 matplotlib.use("Agg")
@@ -20,6 +21,8 @@ app.secret_key = "your_secret_key"
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///database.db"
 
 db = SQLAlchemy(app)
+
+VALID_TRANSACTION_TYPES = {"income", "expense"}
 
 
 class User(db.Model):
@@ -42,6 +45,43 @@ class Transaction(db.Model):
     description = db.Column(db.String(255))
     user_id = db.Column(db.Integer)
     date = db.Column(db.DateTime, default=datetime.utcnow)
+
+
+def parse_transaction_form(form, default_date=None):
+    amount_text = form.get("amount", "").strip()
+    transaction_type = form.get("type", "").strip()
+    category = form.get("category", "").strip()
+    description = form.get("description", "").strip()
+    date_text = form.get("date", "").strip()
+
+    if not amount_text or not transaction_type:
+        return None, "Invalid input. Amount and type are required."
+
+    try:
+        amount = float(amount_text)
+    except ValueError:
+        return None, "Invalid input. Amount must be a number."
+
+    if amount <= 0:
+        return None, "Invalid input. Amount must be greater than 0."
+
+    if transaction_type not in VALID_TRANSACTION_TYPES:
+        return None, "Invalid input. Type must be income or expense."
+
+    parsed_date = default_date or datetime.utcnow()
+    if date_text:
+        try:
+            parsed_date = datetime.strptime(date_text, "%Y-%m-%d")
+        except ValueError:
+            return None, "Invalid input. Date must be valid."
+
+    return {
+        "amount": amount,
+        "type": transaction_type,
+        "category": category,
+        "description": description,
+        "date": parsed_date,
+    }, None
 
 
 def generate_donut_chart(expense_transactions, balance):
@@ -237,22 +277,33 @@ def register():
     if "user_id" in session:
         return redirect("/")
 
-    error = None
     if request.method == "POST":
-        username = request.form["username"]
-        password = request.form["password"]
-        existing_user = User.query.filter_by(username=username).first()
-        if existing_user:
-            error = "Username already exists."
-            return render_template("register.html", error=error)
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "").strip()
 
-        hashed_password = generate_password_hash(password)
-        user = User(username=username, password=hashed_password)
-        db.session.add(user)
-        db.session.commit()
+        if not username or not password:
+            flash("Invalid input. Username and password are required.", "error")
+            return render_template("register.html", error=None)
+
+        try:
+            existing_user = User.query.filter_by(username=username).first()
+            if existing_user:
+                flash("Invalid input. Username already exists.", "error")
+                return render_template("register.html", error=None)
+
+            hashed_password = generate_password_hash(password)
+            user = User(username=username, password=hashed_password)
+            db.session.add(user)
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash("Something went wrong. Please try again.", "error")
+            return render_template("register.html", error=None)
+
+        flash("Registration successful. Please log in.", "success")
         return redirect("/login")
 
-    return render_template("register.html", error=error)
+    return render_template("register.html", error=None)
 
 
 @app.route("/login", methods=["GET", "POST"])
@@ -260,20 +311,28 @@ def login():
     if "user_id" in session:
         return redirect("/")
 
-    error = None
     if request.method == "POST":
-        username = request.form["username"]
-        password = request.form["password"]
-        user = User.query.filter_by(username=username).first()
+        username = request.form.get("username", "").strip()
+        password = request.form.get("password", "").strip()
+
+        if not username or not password:
+            flash("Invalid input. Username and password are required.", "error")
+            return render_template("login.html", error=None)
+
+        try:
+            user = User.query.filter_by(username=username).first()
+        except SQLAlchemyError:
+            flash("Something went wrong. Please try again.", "error")
+            return render_template("login.html", error=None)
 
         if user and check_password_hash(user.password, password):
             session["user_id"] = user.id
             return redirect("/")
 
-        error = "Invalid username or password."
-        return render_template("login.html", error=error)
+        flash("Invalid input. Username or password is incorrect.", "error")
+        return render_template("login.html", error=None)
 
-    return render_template("login.html", error=error)
+    return render_template("login.html", error=None)
 
 
 @app.route("/logout")
@@ -288,19 +347,35 @@ def set_budget():
         return redirect("/login")
 
     budget_amount = request.form.get("budget_amount", "").strip()
+    if not budget_amount:
+        flash("Invalid input. Budget amount is required.", "error")
+        return redirect("/")
+
     try:
         amount = float(budget_amount)
     except ValueError:
-        amount = 0.0
+        flash("Invalid input. Budget must be a number.", "error")
+        return redirect("/")
 
-    budget = Budget.query.filter_by(user_id=session["user_id"]).first()
-    if budget:
-        budget.amount = amount
-    else:
-        budget = Budget(user_id=session["user_id"], amount=amount)
-        db.session.add(budget)
+    if amount <= 0:
+        flash("Invalid input. Budget must be greater than 0.", "error")
+        return redirect("/")
 
-    db.session.commit()
+    try:
+        budget = Budget.query.filter_by(user_id=session["user_id"]).first()
+        if budget:
+            budget.amount = amount
+        else:
+            budget = Budget(user_id=session["user_id"], amount=amount)
+            db.session.add(budget)
+
+        db.session.commit()
+    except SQLAlchemyError:
+        db.session.rollback()
+        flash("Something went wrong. Please try again.", "error")
+        return redirect("/")
+
+    flash("Budget saved successfully.", "success")
 
     filter_date = request.form.get("filter_date", "")
     filter_month = request.form.get("filter_month", "")
@@ -316,53 +391,69 @@ def index():
     if "user_id" not in session:
         return redirect("/login")
 
-    all_expense_transactions = Transaction.query.filter_by(
-        user_id=session["user_id"], type="expense"
-    ).all()
     filter_date = request.args.get("filter_date", "")
     filter_month = request.args.get("filter_month", "")
 
-    query = Transaction.query.filter_by(user_id=session["user_id"])
+    try:
+        all_expense_transactions = Transaction.query.filter_by(
+            user_id=session["user_id"], type="expense"
+        ).all()
+        query = Transaction.query.filter_by(user_id=session["user_id"])
 
-    if filter_date:
-        try:
-            selected_date = datetime.strptime(filter_date, "%Y-%m-%d").date()
-            query = query.filter(func.date(Transaction.date) == selected_date.isoformat())
-        except ValueError:
-            filter_date = ""
-    elif filter_month:
-        try:
-            month_start = datetime.strptime(filter_month, "%Y-%m")
-            if month_start.month == 12:
-                month_end = datetime(month_start.year + 1, 1, 1)
-            else:
-                month_end = datetime(month_start.year, month_start.month + 1, 1)
-            query = query.filter(Transaction.date >= month_start, Transaction.date < month_end)
-        except ValueError:
-            filter_month = ""
+        if filter_date:
+            try:
+                selected_date = datetime.strptime(filter_date, "%Y-%m-%d").date()
+                query = query.filter(func.date(Transaction.date) == selected_date.isoformat())
+            except ValueError:
+                filter_date = ""
+                flash("Invalid input. Date filter was ignored.", "error")
+        elif filter_month:
+            try:
+                month_start = datetime.strptime(filter_month, "%Y-%m")
+                if month_start.month == 12:
+                    month_end = datetime(month_start.year + 1, 1, 1)
+                else:
+                    month_end = datetime(month_start.year, month_start.month + 1, 1)
+                query = query.filter(
+                    Transaction.date >= month_start, Transaction.date < month_end
+                )
+            except ValueError:
+                filter_month = ""
+                flash("Invalid input. Month filter was ignored.", "error")
 
-    transactions = query.order_by(Transaction.date.desc()).all()
-    expense_transactions = [
-        transaction for transaction in transactions if transaction.type == "expense"
-    ]
-    total_income = sum(
-        transaction.amount for transaction in transactions if transaction.type == "income"
-    )
-    total_expense = sum(
-        transaction.amount for transaction in transactions if transaction.type == "expense"
-    )
-    balance = total_income - total_expense
-    savings = total_income - total_expense
-    if total_income > 0:
-        savings_rate = round((savings / total_income) * 100, 2)
-    else:
+        transactions = query.order_by(Transaction.date.desc()).all()
+        expense_transactions = [
+            transaction for transaction in transactions if transaction.type == "expense"
+        ]
+        total_income = sum(
+            transaction.amount for transaction in transactions if transaction.type == "income"
+        )
+        total_expense = sum(
+            transaction.amount for transaction in transactions if transaction.type == "expense"
+        )
+        balance = total_income - total_expense
+        savings = total_income - total_expense
+        if total_income > 0:
+            savings_rate = round((savings / total_income) * 100, 2)
+        else:
+            savings_rate = 0
+        budget = Budget.query.filter_by(user_id=session["user_id"]).first()
+        remaining_budget = budget.amount - total_expense if budget else None
+        budget_exceeded = budget is not None and total_expense > budget.amount
+        insights = build_insights(expense_transactions, all_expense_transactions)
+        generate_donut_chart(expense_transactions, balance)
+        generate_trend_chart(expense_transactions)
+    except Exception:
+        flash("Something went wrong while loading your dashboard.", "error")
+        transactions = []
+        total_income = 0
+        total_expense = 0
+        balance = 0
         savings_rate = 0
-    budget = Budget.query.filter_by(user_id=session["user_id"]).first()
-    remaining_budget = budget.amount - total_expense if budget else None
-    budget_exceeded = budget is not None and total_expense > budget.amount
-    insights = build_insights(expense_transactions, all_expense_transactions)
-    generate_donut_chart(expense_transactions, balance)
-    generate_trend_chart(expense_transactions)
+        budget = None
+        remaining_budget = None
+        budget_exceeded = False
+        insights = ["Something went wrong."]
 
     return render_template(
         "index.html",
@@ -386,26 +477,28 @@ def add_transaction():
         return redirect("/login")
 
     if request.method == "POST":
-        transaction_date = request.form.get("date", "")
-        try:
-            parsed_date = (
-                datetime.strptime(transaction_date, "%Y-%m-%d")
-                if transaction_date
-                else datetime.utcnow()
-            )
-        except ValueError:
-            parsed_date = datetime.utcnow()
+        transaction_data, error_message = parse_transaction_form(request.form)
+        if error_message:
+            flash(error_message, "error")
+            return render_template("add.html")
 
-        transaction = Transaction(
-            amount=float(request.form["amount"]),
-            type=request.form["type"],
-            category=request.form.get("category", ""),
-            description=request.form.get("description", ""),
-            user_id=session["user_id"],
-            date=parsed_date,
-        )
-        db.session.add(transaction)
-        db.session.commit()
+        try:
+            transaction = Transaction(
+                amount=transaction_data["amount"],
+                type=transaction_data["type"],
+                category=transaction_data["category"],
+                description=transaction_data["description"],
+                user_id=session["user_id"],
+                date=transaction_data["date"],
+            )
+            db.session.add(transaction)
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash("Something went wrong. Please try again.", "error")
+            return render_template("add.html")
+
+        flash("Transaction saved successfully.", "success")
         return redirect("/")
 
     return render_template("add.html")
@@ -416,10 +509,17 @@ def delete_transaction(id):
     if "user_id" not in session:
         return redirect("/login")
 
-    transaction = Transaction.query.filter_by(id=id, user_id=session["user_id"]).first()
-    if transaction:
-        db.session.delete(transaction)
-        db.session.commit()
+    try:
+        transaction = Transaction.query.filter_by(id=id, user_id=session["user_id"]).first()
+        if transaction:
+            db.session.delete(transaction)
+            db.session.commit()
+            flash("Transaction deleted successfully.", "success")
+        else:
+            flash("Invalid input. Transaction not found.", "error")
+    except SQLAlchemyError:
+        db.session.rollback()
+        flash("Something went wrong. Please try again.", "error")
     return redirect("/")
 
 
@@ -428,23 +528,37 @@ def edit_transaction(id):
     if "user_id" not in session:
         return redirect("/login")
 
-    transaction = Transaction.query.filter_by(id=id, user_id=session["user_id"]).first()
+    try:
+        transaction = Transaction.query.filter_by(id=id, user_id=session["user_id"]).first()
+    except SQLAlchemyError:
+        flash("Something went wrong. Please try again.", "error")
+        return redirect("/")
+
     if not transaction:
+        flash("Invalid input. Transaction not found.", "error")
         return redirect("/")
 
     if request.method == "POST":
-        transaction_date = request.form.get("date", "")
-        try:
-            if transaction_date:
-                transaction.date = datetime.strptime(transaction_date, "%Y-%m-%d")
-        except ValueError:
-            pass
+        transaction_data, error_message = parse_transaction_form(
+            request.form, default_date=transaction.date or datetime.utcnow()
+        )
+        if error_message:
+            flash(error_message, "error")
+            return render_template("edit.html", transaction=transaction)
 
-        transaction.amount = float(request.form["amount"])
-        transaction.type = request.form["type"]
-        transaction.category = request.form.get("category", "")
-        transaction.description = request.form.get("description", "")
-        db.session.commit()
+        try:
+            transaction.amount = transaction_data["amount"]
+            transaction.type = transaction_data["type"]
+            transaction.category = transaction_data["category"]
+            transaction.description = transaction_data["description"]
+            transaction.date = transaction_data["date"]
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            flash("Something went wrong. Please try again.", "error")
+            return render_template("edit.html", transaction=transaction)
+
+        flash("Transaction updated successfully.", "success")
         return redirect("/")
 
     return render_template("edit.html", transaction=transaction)
@@ -455,19 +569,23 @@ def chart():
     if "user_id" not in session:
         return redirect("/login")
 
-    transactions = Transaction.query.filter_by(user_id=session["user_id"]).all()
-    expense_transactions = Transaction.query.filter_by(
-        user_id=session["user_id"], type="expense"
-    ).all()
-    total_income = sum(
-        transaction.amount for transaction in transactions if transaction.type == "income"
-    )
-    total_expense = sum(
-        transaction.amount for transaction in transactions if transaction.type == "expense"
-    )
-    balance = total_income - total_expense
-    generate_donut_chart(expense_transactions, balance)
-    generate_trend_chart(expense_transactions)
+    try:
+        transactions = Transaction.query.filter_by(user_id=session["user_id"]).all()
+        expense_transactions = Transaction.query.filter_by(
+            user_id=session["user_id"], type="expense"
+        ).all()
+        total_income = sum(
+            transaction.amount for transaction in transactions if transaction.type == "income"
+        )
+        total_expense = sum(
+            transaction.amount for transaction in transactions if transaction.type == "expense"
+        )
+        balance = total_income - total_expense
+        generate_donut_chart(expense_transactions, balance)
+        generate_trend_chart(expense_transactions)
+    except Exception:
+        flash("Something went wrong while loading charts.", "error")
+        return redirect("/")
 
     return render_template("chart.html")
 
@@ -477,20 +595,25 @@ def download_report():
     if "user_id" not in session:
         return redirect("/login")
 
-    transactions = (
-        Transaction.query.filter_by(user_id=session["user_id"])
-        .order_by(Transaction.date.desc())
-        .all()
-    )
-    total_income = sum(
-        transaction.amount for transaction in transactions if transaction.type == "income"
-    )
-    total_expense = sum(
-        transaction.amount for transaction in transactions if transaction.type == "expense"
-    )
-    balance = total_income - total_expense
+    try:
+        transactions = (
+            Transaction.query.filter_by(user_id=session["user_id"])
+            .order_by(Transaction.date.desc())
+            .all()
+        )
+        total_income = sum(
+            transaction.amount for transaction in transactions if transaction.type == "income"
+        )
+        total_expense = sum(
+            transaction.amount for transaction in transactions if transaction.type == "expense"
+        )
+        balance = total_income - total_expense
 
-    report_path = generate_pdf_report(transactions, total_income, total_expense, balance)
+        report_path = generate_pdf_report(transactions, total_income, total_expense, balance)
+    except Exception:
+        flash("Something went wrong while generating the report.", "error")
+        return redirect("/")
+
     return send_file(report_path, as_attachment=True, download_name="report.pdf")
 
 

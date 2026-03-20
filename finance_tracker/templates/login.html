@@ -7,13 +7,9 @@
     <h2 style="margin-top:0;text-align:center;color:#333;">Login</h2>
     <p style="text-align:center;color:#666;margin-bottom:25px;">Access your finance dashboard.</p>
 
-    {% if error %}
-    <div style="background:#fdecea;color:#e74c3c;padding:10px;border-radius:5px;margin-bottom:15px;text-align:center;border:1px solid #f5c6cb;">{{ error }}</div>
-    {% endif %}
-
     <form method="POST">
         <label for="username" style="display:block;margin-bottom:6px;color:#333;font-weight:bold;">Username</label>
-        <input type="text" id="username" name="username" required style="width:100%;padding:10px;margin-bottom:10px;border-radius:5px;border:1px solid #ccc;box-sizing:border-box;">
+        <input type="text" id="username" name="username" value="{{ request.form.get('username', '') }}" required style="width:100%;padding:10px;margin-bottom:10px;border-radius:5px;border:1px solid #ccc;box-sizing:border-box;">
 
         <label for="password" style="display:block;margin-bottom:6px;color:#333;font-weight:bold;">Password</label>
         <input type="password" id="password" name="password" required style="width:100%;padding:10px;margin-bottom:20px;border-radius:5px;border:1px solid #ccc;box-sizing:border-box;">
