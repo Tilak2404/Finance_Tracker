@@ -29,6 +29,57 @@ class Transaction(db.Model):
     description = db.Column(db.String(255))
 
 
+def generate_donut_chart(expense_transactions):
+    static_folder = os.path.join(app.root_path, "static")
+    os.makedirs(static_folder, exist_ok=True)
+    chart_path = os.path.join(static_folder, "chart.png")
+
+    categories = ["Food", "Transport", "Bills", "Shopping", "Entertainment", "Health"]
+    category_totals = {
+        "Food": 0,
+        "Transport": 0,
+        "Bills": 0,
+        "Shopping": 0,
+        "Entertainment": 0,
+        "Health": 0,
+        "Miscellaneous": 0,
+    }
+
+    for transaction in expense_transactions:
+        normalized_category = (transaction.category or "").strip().title()
+        if normalized_category in categories:
+            category_totals[normalized_category] += transaction.amount
+        else:
+            category_totals["Miscellaneous"] += transaction.amount
+
+    labels = []
+    values = []
+    for category, total in category_totals.items():
+        if total > 0:
+            labels.append(category)
+            values.append(total)
+
+    plt.figure(figsize=(6, 6))
+    if not values:
+        plt.pie([1], colors=["#dfe6e9"], startangle=90)
+        plt.text(0, 0, "No Expenses", ha="center", va="center", fontsize=12)
+    else:
+        plt.pie(
+            values,
+            labels=labels,
+            autopct="%1.1f%%",
+            startangle=90,
+        )
+
+    centre_circle = plt.Circle((0, 0), 0.70, fc="white")
+    fig = plt.gcf()
+    fig.gca().add_artist(centre_circle)
+    plt.axis("equal")
+    plt.title("Expenses by Category")
+    plt.savefig(chart_path, bbox_inches="tight")
+    plt.close()
+
+
 @app.route("/register", methods=["GET", "POST"])
 def register():
     if "user_id" in session:
@@ -84,6 +135,9 @@ def index():
         return redirect("/login")
 
     transactions = Transaction.query.all()
+    expense_transactions = [
+        transaction for transaction in transactions if transaction.type == "expense"
+    ]
     total_income = sum(
         transaction.amount for transaction in transactions if transaction.type == "income"
     )
@@ -91,6 +145,7 @@ def index():
         transaction.amount for transaction in transactions if transaction.type == "expense"
     )
     balance = total_income - total_expense
+    generate_donut_chart(expense_transactions)
 
     return render_template(
         "index.html",
@@ -157,35 +212,8 @@ def chart():
     if "user_id" not in session:
         return redirect("/login")
 
-    transactions = Transaction.query.all()
-    total_income = sum(
-        transaction.amount for transaction in transactions if transaction.type == "income"
-    )
-    total_expense = sum(
-        transaction.amount for transaction in transactions if transaction.type == "expense"
-    )
-
-    static_folder = os.path.join(app.root_path, "static")
-    os.makedirs(static_folder, exist_ok=True)
-    chart_path = os.path.join(static_folder, "chart.png")
-
-    plt.figure(figsize=(6, 6))
-    if total_income == 0 and total_expense == 0:
-        plt.text(0.5, 0.5, "No transactions yet", ha="center", va="center", fontsize=16)
-        plt.axis("off")
-    else:
-        plt.pie(
-            [total_income, total_expense],
-            labels=["Income", "Expense"],
-            autopct="%1.1f%%",
-            startangle=90,
-            colors=["#2da44e", "#cf222e"],
-        )
-        plt.axis("equal")
-
-    plt.title("Income vs Expense")
-    plt.savefig(chart_path, bbox_inches="tight")
-    plt.close()
+    expense_transactions = Transaction.query.filter_by(type="expense").all()
+    generate_donut_chart(expense_transactions)
 
     return render_template("chart.html")
 
