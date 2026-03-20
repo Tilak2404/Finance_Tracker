@@ -1,5 +1,5 @@
 import os
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 import matplotlib
 from flask import Flask, flash, redirect, render_template, request, send_file, session
@@ -25,6 +25,10 @@ db = SQLAlchemy(app)
 VALID_TRANSACTION_TYPES = {"income", "expense"}
 
 
+def utc_now():
+    return datetime.now(UTC).replace(tzinfo=None)
+
+
 class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(100), unique=True, nullable=False)
@@ -45,7 +49,7 @@ class Transaction(db.Model):
     description = db.Column(db.String(255))
     tags = db.Column(db.String)
     user_id = db.Column(db.Integer)
-    date = db.Column(db.DateTime, default=datetime.utcnow)
+    date = db.Column(db.DateTime, default=utc_now)
 
 
 def parse_transaction_form(form, default_date=None):
@@ -70,7 +74,7 @@ def parse_transaction_form(form, default_date=None):
     if transaction_type not in VALID_TRANSACTION_TYPES:
         return None, "Invalid input. Type must be income or expense."
 
-    parsed_date = default_date or datetime.utcnow()
+    parsed_date = default_date or utc_now()
     if date_text:
         try:
             parsed_date = datetime.strptime(date_text, "%Y-%m-%d")
@@ -196,7 +200,7 @@ def build_insights(filtered_expense_transactions, all_expense_transactions):
     else:
         insights.append("Add some expense transactions to unlock spending insights.")
 
-    today = datetime.utcnow().date()
+    today = utc_now().date()
     start_of_this_week = today - timedelta(days=today.weekday())
     start_of_next_week = start_of_this_week + timedelta(days=7)
     start_of_last_week = start_of_this_week - timedelta(days=7)
@@ -544,7 +548,7 @@ def edit_transaction(id):
 
     if request.method == "POST":
         transaction_data, error_message = parse_transaction_form(
-            request.form, default_date=transaction.date or datetime.utcnow()
+            request.form, default_date=transaction.date or utc_now()
         )
         if error_message:
             flash(error_message, "error")
