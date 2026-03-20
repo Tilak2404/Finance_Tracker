@@ -38,6 +38,15 @@ TRANSACTION_CATEGORIES = [
     "Education",
     "Other",
 ]
+CATEGORY_CHART_COLORS = {
+    "Food": "#f97316",
+    "Transport": "#38bdf8",
+    "Bills": "#ef4444",
+    "Shopping": "#a855f7",
+    "Entertainment": "#f59e0b",
+    "Health": "#22c55e",
+    "Miscellaneous": "#94a3b8",
+}
 
 
 def utc_now():
@@ -193,7 +202,6 @@ def generate_donut_chart(expense_transactions, balance):
     static_folder = os.path.join(app.root_path, "static")
     os.makedirs(static_folder, exist_ok=True)
     chart_path = os.path.join(static_folder, "chart.png")
-    chart_colors = ["#22c55e", "#4ade80", "#16a34a", "#15803d", "#86efac"]
 
     categories = ["Food", "Transport", "Bills", "Shopping", "Entertainment", "Health"]
     category_totals = {
@@ -224,12 +232,12 @@ def generate_donut_chart(expense_transactions, balance):
     fig, ax = plt.subplots(figsize=(6, 6))
     fig.patch.set_facecolor("#020617")
     ax.set_facecolor("#020617")
-    pie_colors = [chart_colors[index % len(chart_colors)] for index in range(max(len(values), 1))]
+    pie_colors = [CATEGORY_CHART_COLORS.get(label, "#94a3b8") for label in labels] or ["#22c55e"]
 
     if not values:
         ax.pie(
             [1],
-            colors=[chart_colors[0]],
+            colors=pie_colors,
             startangle=90,
             textprops={"color": "white"},
             wedgeprops={"linewidth": 1, "edgecolor": "#0f172a"},
