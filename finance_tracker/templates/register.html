@@ -3,26 +3,26 @@
 {% block title %}Register | Finance Tracker{% endblock %}
 
 {% block content %}
-<div class="card form-card">
-    <h1 class="page-title center-text">Register</h1>
-    <p class="page-subtitle center-text">Create an account to start using the app.</p>
+<div style="max-width:420px;margin:0 auto;background:white;padding:30px;border-radius:12px;box-shadow:0 4px 10px rgba(0,0,0,0.1);">
+    <h2 style="margin-top:0;text-align:center;color:#333;">Register</h2>
+    <p style="text-align:center;color:#666;margin-bottom:25px;">Create your account to start tracking finances.</p>
 
     {% if error %}
-    <div class="error-message">{{ error }}</div>
+    <div style="background:#fdecea;color:#e74c3c;padding:10px;border-radius:5px;margin-bottom:15px;text-align:center;border:1px solid #f5c6cb;">{{ error }}</div>
     {% endif %}
 
     <form method="POST">
-        <label for="username">Username</label>
-        <input type="text" id="username" name="username" required>
+        <label for="username" style="display:block;margin-bottom:6px;color:#333;font-weight:bold;">Username</label>
+        <input type="text" id="username" name="username" required style="width:100%;padding:10px;margin-bottom:10px;border-radius:5px;border:1px solid #ccc;box-sizing:border-box;">
 
-        <label for="password">Password</label>
-        <input type="password" id="password" name="password" required>
+        <label for="password" style="display:block;margin-bottom:6px;color:#333;font-weight:bold;">Password</label>
+        <input type="password" id="password" name="password" required style="width:100%;padding:10px;margin-bottom:20px;border-radius:5px;border:1px solid #ccc;box-sizing:border-box;">
 
-        <button type="submit">Register</button>
+        <button type="submit" style="width:100%;background:#2ecc71;color:white;padding:10px;border:none;border-radius:5px;cursor:pointer;font-size:16px;">Register</button>
     </form>
 
-    <div class="helper-links">
-        <a href="/login">Already have an account? Login</a>
+    <div style="text-align:center;margin-top:15px;">
+        <a href="/login" style="color:#2ecc71;text-decoration:none;">Already have an account? Login</a>
     </div>
 </div>
 {% endblock %}

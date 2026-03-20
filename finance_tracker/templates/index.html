@@ -3,73 +3,64 @@
 {% block title %}Dashboard | Finance Tracker{% endblock %}
 
 {% block content %}
-<div class="card center-text">
-    <h1 class="page-title">Finance Tracker Dashboard</h1>
-    <p class="page-subtitle">Track your income, expenses, and overall balance in one place.</p>
-    <div class="page-actions">
-        <a class="btn btn-primary" href="/add">Add Transaction</a>
-        <a class="btn btn-secondary" href="/chart">View Chart</a>
+<div style="display:flex;gap:20px;flex-wrap:wrap;align-items:stretch;">
+    <div style="flex:1;min-width:250px;">
+        <div style="background:#2ecc71;color:white;padding:20px;border-radius:12px;margin-bottom:15px;box-shadow:0 4px 10px rgba(0,0,0,0.1);">
+            <h4 style="margin:0 0 10px 0;">Total Income</h4>
+            <h2 style="margin:0;">&#8377;{{ '%.2f'|format(total_income) }}</h2>
+        </div>
+
+        <div style="background:#e74c3c;color:white;padding:20px;border-radius:12px;margin-bottom:15px;box-shadow:0 4px 10px rgba(0,0,0,0.1);">
+            <h4 style="margin:0 0 10px 0;">Total Expense</h4>
+            <h2 style="margin:0;">&#8377;{{ '%.2f'|format(total_expense) }}</h2>
+        </div>
+
+        <div style="background:#34495e;color:white;padding:20px;border-radius:12px;box-shadow:0 4px 10px rgba(0,0,0,0.1);">
+            <h4 style="margin:0 0 10px 0;">Balance</h4>
+            <h2 style="margin:0;">&#8377;{{ '%.2f'|format(balance) }}</h2>
+        </div>
+    </div>
+
+    <div style="flex:1;min-width:300px;background:white;padding:20px;border-radius:12px;box-shadow:0 4px 10px rgba(0,0,0,0.1);text-align:center;">
+        <h3 style="margin-top:0;">Spending Overview</h3>
+        <img src="/static/chart.png" alt="Expenses by category donut chart" style="width:250px;max-width:100%;margin-top:10px;">
+        <div style="margin-top:20px;">
+            <a href="/add" style="display:inline-block;background:#2ecc71;color:white;padding:10px 16px;border-radius:6px;text-decoration:none;margin-right:10px;">Add Transaction</a>
+            <a href="/chart" style="display:inline-block;background:#34495e;color:white;padding:10px 16px;border-radius:6px;text-decoration:none;">Open Chart</a>
+        </div>
     </div>
 </div>
 
-<div class="summary-grid">
-    <div class="summary-card income-card">
-        <h3>Total Income</h3>
-        <p>{{ "%.2f"|format(total_income) }}</p>
-    </div>
-    <div class="summary-card expense-card">
-        <h3>Total Expense</h3>
-        <p>{{ "%.2f"|format(total_expense) }}</p>
-    </div>
-    <div class="summary-card balance-card">
-        <h3>Balance</h3>
-        <p>{{ "%.2f"|format(balance) }}</p>
-    </div>
-</div>
+<div style="background:white;margin-top:30px;padding:20px;border-radius:12px;box-shadow:0 4px 10px rgba(0,0,0,0.1);">
+    <h3 style="margin-top:0;">Transactions</h3>
 
-<div class="card center-text">
-    <h2 style="margin-top: 0;">Overview</h2>
-    <div>
-        <img class="chart-image" src="/static/chart.png" width="300" alt="Expenses by category donut chart">
-    </div>
-</div>
-
-<div class="card">
-    <h2 style="margin-top: 0;">Transactions</h2>
     {% if transactions %}
-    <div class="table-wrapper">
-        <table>
-            <thead>
-                <tr>
-                    <th>Amount</th>
-                    <th>Type</th>
-                    <th>Category</th>
-                    <th>Description</th>
-                    <th>Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for transaction in transactions %}
-                <tr>
-                    <td>{{ "%.2f"|format(transaction.amount) }}</td>
-                    <td>{{ transaction.type|title }}</td>
-                    <td>{{ transaction.category or "-" }}</td>
-                    <td>{{ transaction.description or "-" }}</td>
-                    <td>
-                        <div class="table-actions">
-                            <a class="btn btn-edit" href="/edit/{{ transaction.id }}">Edit</a>
-                            <a class="btn btn-danger" href="/delete/{{ transaction.id }}">Delete</a>
-                        </div>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
+    <div style="overflow-x:auto;">
+        <table style="width:100%;border-collapse:collapse;margin-top:10px;">
+            <tr style="background:#f1f1f1;">
+                <th style="padding:10px;border-bottom:1px solid #ddd;text-align:left;">Amount</th>
+                <th style="padding:10px;border-bottom:1px solid #ddd;text-align:left;">Type</th>
+                <th style="padding:10px;border-bottom:1px solid #ddd;text-align:left;">Category</th>
+                <th style="padding:10px;border-bottom:1px solid #ddd;text-align:left;">Actions</th>
+            </tr>
+
+            {% for t in transactions %}
+            <tr style="background:{% if loop.index0 % 2 == 0 %}#ffffff{% else %}#fafafa{% endif %};">
+                <td style="padding:10px;border-bottom:1px solid #eee;">&#8377;{{ '%.2f'|format(t.amount) }}</td>
+                <td style="padding:10px;border-bottom:1px solid #eee;">{{ t.type }}</td>
+                <td style="padding:10px;border-bottom:1px solid #eee;">{{ t.category or 'Miscellaneous' }}</td>
+                <td style="padding:10px;border-bottom:1px solid #eee;white-space:nowrap;">
+                    <a href="/edit/{{ t.id }}" style="background:#3498db;color:white;padding:5px 10px;border-radius:5px;text-decoration:none;display:inline-block;">Edit</a>
+                    <a href="/delete/{{ t.id }}" style="background:#e74c3c;color:white;padding:5px 10px;border-radius:5px;text-decoration:none;margin-left:5px;display:inline-block;">Delete</a>
+                </td>
+            </tr>
+            {% endfor %}
         </table>
     </div>
     {% else %}
-    <div class="empty-state">
-        <p>No transactions added yet.</p>
-        <a class="btn btn-primary" href="/add">Add Your First Transaction</a>
+    <div style="padding:30px 10px;text-align:center;color:#666;">
+        <p style="margin:0 0 15px 0;">No transactions added yet.</p>
+        <a href="/add" style="display:inline-block;background:#2ecc71;color:white;padding:10px 16px;border-radius:6px;text-decoration:none;">Create Your First Transaction</a>
     </div>
     {% endif %}
 </div>

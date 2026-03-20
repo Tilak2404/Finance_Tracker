@@ -3,31 +3,31 @@
 {% block title %}Edit Transaction | Finance Tracker{% endblock %}
 
 {% block content %}
-<div class="card form-card">
-    <h1 class="page-title center-text">Edit Transaction</h1>
-    <p class="page-subtitle center-text">Update the transaction details below.</p>
+<div style="max-width:450px;margin:0 auto;background:white;padding:30px;border-radius:12px;box-shadow:0 4px 10px rgba(0,0,0,0.1);">
+    <h2 style="margin-top:0;text-align:center;color:#333;">Edit Transaction</h2>
+    <p style="text-align:center;color:#666;margin-bottom:25px;">Update the transaction details below.</p>
 
     <form method="POST">
-        <label for="amount">Amount</label>
-        <input type="number" id="amount" name="amount" step="0.01" min="0" value="{{ transaction.amount }}" required>
+        <label for="amount" style="display:block;margin-bottom:6px;color:#333;font-weight:bold;">Amount</label>
+        <input type="number" id="amount" name="amount" step="0.01" min="0" value="{{ transaction.amount }}" required style="width:100%;padding:10px;margin-bottom:10px;border-radius:5px;border:1px solid #ccc;box-sizing:border-box;">
 
-        <label for="type">Type</label>
-        <select id="type" name="type" required>
+        <label for="type" style="display:block;margin-bottom:6px;color:#333;font-weight:bold;">Type</label>
+        <select id="type" name="type" required style="width:100%;padding:10px;margin-bottom:10px;border-radius:5px;border:1px solid #ccc;box-sizing:border-box;">
             <option value="income" {% if transaction.type == "income" %}selected{% endif %}>Income</option>
             <option value="expense" {% if transaction.type == "expense" %}selected{% endif %}>Expense</option>
         </select>
 
-        <label for="category">Category</label>
-        <input type="text" id="category" name="category" value="{{ transaction.category or '' }}" placeholder="Salary, Food, Rent">
+        <label for="category" style="display:block;margin-bottom:6px;color:#333;font-weight:bold;">Category</label>
+        <input type="text" id="category" name="category" value="{{ transaction.category or '' }}" style="width:100%;padding:10px;margin-bottom:10px;border-radius:5px;border:1px solid #ccc;box-sizing:border-box;">
 
-        <label for="description">Description</label>
-        <input type="text" id="description" name="description" value="{{ transaction.description or '' }}" placeholder="Optional description">
+        <label for="description" style="display:block;margin-bottom:6px;color:#333;font-weight:bold;">Description</label>
+        <input type="text" id="description" name="description" value="{{ transaction.description or '' }}" style="width:100%;padding:10px;margin-bottom:20px;border-radius:5px;border:1px solid #ccc;box-sizing:border-box;">
 
-        <button type="submit">Update Transaction</button>
+        <button type="submit" style="width:100%;background:#2ecc71;color:white;padding:10px;border:none;border-radius:5px;cursor:pointer;font-size:16px;">Update Transaction</button>
     </form>
 
-    <div class="helper-links">
-        <a href="/">Back to Dashboard</a>
+    <div style="text-align:center;margin-top:15px;">
+        <a href="/" style="color:#2ecc71;text-decoration:none;">Back to Dashboard</a>
     </div>
 </div>
 {% endblock %}

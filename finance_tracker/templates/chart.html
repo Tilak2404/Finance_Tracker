@@ -3,13 +3,15 @@
 {% block title %}Chart | Finance Tracker{% endblock %}
 
 {% block content %}
-<div class="card center-text">
-    <h1 class="page-title">Expense Chart</h1>
-    <p class="page-subtitle">A backend-generated donut chart showing how your expenses are distributed across categories.</p>
-    <img class="chart-image" src="/static/chart.png" alt="Expenses by category donut chart">
-    <div class="page-actions">
-        <a class="btn btn-secondary" href="/">Back to Dashboard</a>
-        <a class="btn btn-primary" href="/add">Add Transaction</a>
+<div style="max-width:700px;margin:0 auto;background:white;padding:30px;border-radius:12px;box-shadow:0 4px 10px rgba(0,0,0,0.1);text-align:center;">
+    <h2 style="margin-top:0;color:#333;">Expenses by Category</h2>
+    <p style="color:#666;margin-bottom:20px;">A backend-generated donut chart showing your current spending split.</p>
+
+    <img src="/static/chart.png" alt="Expenses by category donut chart" style="width:320px;max-width:100%;margin-top:10px;">
+
+    <div style="margin-top:25px;">
+        <a href="/" style="display:inline-block;background:#34495e;color:white;padding:10px 16px;border-radius:6px;text-decoration:none;margin-right:10px;">Back to Dashboard</a>
+        <a href="/add" style="display:inline-block;background:#2ecc71;color:white;padding:10px 16px;border-radius:6px;text-decoration:none;">Add Transaction</a>
     </div>
 </div>
 {% endblock %}
