@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block title %}Register | Finance Tracker{% endblock %}
+
+{% block content %}
+<header class="topbar">
+    <a class="brand" href="/login">
+        <span class="brand-mark">FT</span>
+        <span class="brand-copy">
+            <strong>Finance Tracker</strong>
+            <span>Personal cash flow dashboard</span>
+        </span>
+    </a>
+</header>
+
+<section class="glass-card auth-shell">
+    <div class="auth-copy">
+        <p class="eyebrow">Create Access</p>
+        <h1>Build a private finance workspace that is calm and easy to use.</h1>
+        <p>Register once, then manage your transactions, totals, and chart view from a single polished place.</p>
+
+        <div class="auth-badges">
+            <span class="info-tag">Income tracking</span>
+            <span class="info-tag">Expense control</span>
+            <span class="info-tag">Visual summary</span>
+        </div>
+    </div>
+
+    <div class="auth-panel">
+        <p class="eyebrow">New Account</p>
+        <h2>Register</h2>
+        <p>Create a username and password to get started.</p>
+
+        {% if error %}
+        <div class="error-banner">{{ error }}</div>
+        {% endif %}
+
+        <form method="POST" class="auth-form">
+            <div class="field-group">
+                <label for="username">Username</label>
+                <input type="text" id="username" name="username" placeholder="Choose a username" required>
+            </div>
+
+            <div class="field-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" placeholder="Create a password" required>
+            </div>
+
+            <button class="btn btn-primary btn-block" type="submit">Register</button>
+        </form>
+
+        <p style="margin-top: 18px; color: var(--muted);">
+            Already registered?
+            <a class="helper-link" href="/login">Go to login</a>
+        </p>
+    </div>
+</section>
+{% endblock %}

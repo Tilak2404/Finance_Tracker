@@ -1,0 +1,123 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard | Finance Tracker{% endblock %}
+
+{% block content %}
+<header class="topbar">
+    <a class="brand" href="/">
+        <span class="brand-mark">FT</span>
+        <span class="brand-copy">
+            <strong>Finance Tracker</strong>
+            <span>Personal cash flow dashboard</span>
+        </span>
+    </a>
+
+    <div class="button-row">
+        <a class="btn btn-primary" href="/add">Add Transaction</a>
+        <a class="btn btn-soft" href="/chart">View Chart</a>
+        <a class="btn btn-warm" href="/logout">Logout</a>
+    </div>
+</header>
+
+<section class="hero glass-card">
+    <div>
+        <p class="eyebrow">Daily Overview</p>
+        <h1>Know where your money moves before the month gets away from you.</h1>
+        <p>Track every inflow, every outflow, and the balance between them from one calm dashboard built for quick decisions.</p>
+    </div>
+
+    <div class="hero-panel">
+        <div class="mini-metrics">
+            <div class="mini-metric">
+                <span>Transactions recorded</span>
+                <strong>{{ transactions|length }}</strong>
+            </div>
+            <div class="mini-metric">
+                <span>Income entries</span>
+                <strong>{{ transactions|selectattr("type", "equalto", "income")|list|length }}</strong>
+            </div>
+            <div class="mini-metric">
+                <span>Expense entries</span>
+                <strong>{{ transactions|selectattr("type", "equalto", "expense")|list|length }}</strong>
+            </div>
+        </div>
+    </div>
+</section>
+
+<section class="stats-grid">
+    <article class="glass-card stat-card stat-income">
+        <h3>Total Income</h3>
+        <strong>{{ "%.2f"|format(total_income) }}</strong>
+        <p>All recorded inflows across your account.</p>
+    </article>
+
+    <article class="glass-card stat-card stat-expense">
+        <h3>Total Expense</h3>
+        <strong>{{ "%.2f"|format(total_expense) }}</strong>
+        <p>Every outgoing payment currently tracked.</p>
+    </article>
+
+    <article class="glass-card stat-card stat-balance">
+        <h3>Balance</h3>
+        <strong>{{ "%.2f"|format(balance) }}</strong>
+        <p>The net result after income and expense.</p>
+    </article>
+</section>
+
+{% if transactions %}
+<section class="glass-card table-card">
+    <div class="section-head">
+        <div>
+            <p class="eyebrow">Ledger</p>
+            <h2>Recent Transactions</h2>
+        </div>
+        <p class="section-note">{{ transactions|length }} total entries currently visible.</p>
+    </div>
+
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Amount</th>
+                    <th>Type</th>
+                    <th>Category</th>
+                    <th>Description</th>
+                    <th>Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for transaction in transactions %}
+                <tr>
+                    <td>
+                        <span class="amount {% if transaction.type == 'income' %}amount-income{% else %}amount-expense{% endif %}">
+                            {{ "%.2f"|format(transaction.amount) }}
+                        </span>
+                    </td>
+                    <td>
+                        <span class="pill {% if transaction.type == 'income' %}pill-income{% else %}pill-expense{% endif %}">
+                            {{ transaction.type }}
+                        </span>
+                    </td>
+                    <td class="muted-cell">{{ transaction.category or "Uncategorized" }}</td>
+                    <td class="muted-cell">{{ transaction.description or "No description added" }}</td>
+                    <td>
+                        <div class="table-actions">
+                            <a class="btn btn-soft btn-small" href="/edit/{{ transaction.id }}">Edit</a>
+                            <a class="btn btn-danger btn-small" href="/delete/{{ transaction.id }}">Delete</a>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% else %}
+<section class="glass-card empty-state">
+    <p class="eyebrow">Ready When You Are</p>
+    <h2>Your dashboard is clean and waiting for the first entry.</h2>
+    <p>Add your first income or expense to turn this view into a live picture of your finances.</p>
+    <a class="btn btn-primary" href="/add">Create First Transaction</a>
+</section>
+{% endif %}
+{% endblock %}

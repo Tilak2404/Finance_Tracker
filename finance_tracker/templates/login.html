@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block title %}Login | Finance Tracker{% endblock %}
+
+{% block content %}
+<header class="topbar">
+    <a class="brand" href="/login">
+        <span class="brand-mark">FT</span>
+        <span class="brand-copy">
+            <strong>Finance Tracker</strong>
+            <span>Personal cash flow dashboard</span>
+        </span>
+    </a>
+</header>
+
+<section class="glass-card auth-shell">
+    <div class="auth-copy">
+        <p class="eyebrow">Welcome Back</p>
+        <h1>See your finances with more clarity and less clutter.</h1>
+        <p>Log in to your workspace and continue tracking income, expenses, and balance from one focused dashboard.</p>
+
+        <div class="auth-badges">
+            <span class="info-tag">Clean dashboard</span>
+            <span class="info-tag">Quick entry</span>
+            <span class="info-tag">Instant chart view</span>
+        </div>
+    </div>
+
+    <div class="auth-panel">
+        <p class="eyebrow">Sign In</p>
+        <h2>Login</h2>
+        <p>Use your username and password to access the tracker.</p>
+
+        {% if error %}
+        <div class="error-banner">{{ error }}</div>
+        {% endif %}
+
+        <form method="POST" class="auth-form">
+            <div class="field-group">
+                <label for="username">Username</label>
+                <input type="text" id="username" name="username" placeholder="Enter your username" required>
+            </div>
+
+            <div class="field-group">
+                <label for="password">Password</label>
+                <input type="password" id="password" name="password" placeholder="Enter your password" required>
+            </div>
+
+            <button class="btn btn-primary btn-block" type="submit">Login</button>
+        </form>
+
+        <p style="margin-top: 18px; color: var(--muted);">
+            Need an account?
+            <a class="helper-link" href="/register">Create one here</a>
+        </p>
+    </div>
+</section>
+{% endblock %}

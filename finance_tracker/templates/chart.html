@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+
+{% block title %}Expense Chart | Finance Tracker{% endblock %}
+
+{% block content %}
+<header class="topbar">
+    <a class="brand" href="/">
+        <span class="brand-mark">FT</span>
+        <span class="brand-copy">
+            <strong>Finance Tracker</strong>
+            <span>Personal cash flow dashboard</span>
+        </span>
+    </a>
+
+    <div class="button-row">
+        <a class="btn btn-soft" href="/">Back to Dashboard</a>
+        <a class="btn btn-primary" href="/add">Add Transaction</a>
+        <a class="btn btn-warm" href="/logout">Logout</a>
+    </div>
+</header>
+
+<section class="glass-card chart-hero" style="margin-bottom: 22px;">
+    <p class="eyebrow">Visual Summary</p>
+    <h1>Expense Chart</h1>
+    <p>Your chart is generated on the backend and refreshed from the latest transaction data every time you open this page.</p>
+    <div class="info-strip">
+        <span class="info-tag">Python generated</span>
+        <span class="info-tag">No JavaScript</span>
+        <span class="info-tag">Current ledger snapshot</span>
+    </div>
+</section>
+
+<section class="glass-card chart-card">
+    <img class="chart-image" src="/static/chart.png" alt="Income and expense pie chart">
+    <p>The chart compares total income and total expense from your recorded transactions.</p>
+</section>
+{% endblock %}
