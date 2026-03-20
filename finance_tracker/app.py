@@ -8,7 +8,7 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
-from sqlalchemy import func
+from sqlalchemy import func, inspect, text
 from sqlalchemy.exc import SQLAlchemyError
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -23,6 +23,7 @@ app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///database.db"
 db = SQLAlchemy(app)
 
 VALID_TRANSACTION_TYPES = {"income", "expense"}
+KNOWN_PASSWORD_HASH_PREFIXES = ("scrypt:", "pbkdf2:", "argon2:")
 
 
 def utc_now():
@@ -50,6 +51,65 @@ class Transaction(db.Model):
     tags = db.Column(db.String)
     user_id = db.Column(db.Integer)
     date = db.Column(db.DateTime, default=utc_now)
+
+
+def ensure_database_ready():
+    db.create_all()
+
+    inspector = inspect(db.engine)
+    table_names = set(inspector.get_table_names())
+    schema_changed = False
+    column_updates = {
+        "transaction": {
+            "category": 'ALTER TABLE "transaction" ADD COLUMN category VARCHAR(100)',
+            "description": 'ALTER TABLE "transaction" ADD COLUMN description VARCHAR(255)',
+            "tags": 'ALTER TABLE "transaction" ADD COLUMN tags VARCHAR',
+            "user_id": 'ALTER TABLE "transaction" ADD COLUMN user_id INTEGER',
+            "date": 'ALTER TABLE "transaction" ADD COLUMN date DATETIME',
+        },
+        "budget": {
+            "user_id": 'ALTER TABLE budget ADD COLUMN user_id INTEGER',
+            "amount": "ALTER TABLE budget ADD COLUMN amount FLOAT",
+        },
+    }
+
+    for table_name, statements in column_updates.items():
+        if table_name not in table_names:
+            continue
+
+        existing_columns = {column["name"] for column in inspector.get_columns(table_name)}
+        for column_name, statement in statements.items():
+            if column_name not in existing_columns:
+                db.session.execute(text(statement))
+                schema_changed = True
+
+    if schema_changed:
+        db.session.commit()
+
+
+def verify_user_password(user, entered_password):
+    if not user.password.startswith(KNOWN_PASSWORD_HASH_PREFIXES):
+        if user.password != entered_password:
+            return False, "Incorrect password. If this is an old account, register again with a new password."
+
+        try:
+            user.password = generate_password_hash(entered_password)
+            db.session.commit()
+        except SQLAlchemyError:
+            db.session.rollback()
+            return False, "Your account uses an old password format and could not be upgraded."
+
+        return True, "Your account password was upgraded to the secure format."
+
+    try:
+        return check_password_hash(user.password, entered_password), None
+    except (ValueError, TypeError):
+        return False, "Incorrect password. If this is an old account, register again with a new password."
+
+
+@app.before_request
+def initialize_database():
+    ensure_database_ready()
 
 
 def parse_transaction_form(form, default_date=None):
@@ -286,10 +346,19 @@ def register():
 
     if request.method == "POST":
         username = request.form.get("username", "").strip()
-        password = request.form.get("password", "").strip()
+        password = request.form.get("password", "")
+        confirm_password = request.form.get("confirm_password", "")
 
-        if not username or not password:
-            flash("Invalid input. Username and password are required.", "error")
+        if not username or not password or not confirm_password:
+            flash("Invalid input. Username, password, and confirm password are required.", "error")
+            return render_template("register.html", error=None)
+
+        if len(password) < 8:
+            flash("Invalid input. Password must be at least 8 characters.", "error")
+            return render_template("register.html", error=None)
+
+        if password != confirm_password:
+            flash("Invalid input. Password and confirm password must match.", "error")
             return render_template("register.html", error=None)
 
         try:
@@ -304,7 +373,7 @@ def register():
             db.session.commit()
         except SQLAlchemyError:
             db.session.rollback()
-            flash("Something went wrong. Please try again.", "error")
+            flash("Something went wrong while creating the account. Please try again.", "error")
             return render_template("register.html", error=None)
 
         flash("Registration successful. Please log in.", "success")
@@ -320,7 +389,7 @@ def login():
 
     if request.method == "POST":
         username = request.form.get("username", "").strip()
-        password = request.form.get("password", "").strip()
+        password = request.form.get("password", "")
 
         if not username or not password:
             flash("Invalid input. Username and password are required.", "error")
@@ -332,11 +401,18 @@ def login():
             flash("Something went wrong. Please try again.", "error")
             return render_template("login.html", error=None)
 
-        if user and check_password_hash(user.password, password):
+        if not user:
+            flash("Invalid input. Username or password is incorrect.", "error")
+            return render_template("login.html", error=None)
+
+        password_matches, upgrade_message = verify_user_password(user, password)
+        if password_matches:
             session["user_id"] = user.id
+            if upgrade_message:
+                flash(upgrade_message, "success")
             return redirect("/")
 
-        flash("Invalid input. Username or password is incorrect.", "error")
+        flash(upgrade_message or "Invalid input. Username or password is incorrect.", "error")
         return render_template("login.html", error=None)
 
     return render_template("login.html", error=None)

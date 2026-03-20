@@ -5,14 +5,18 @@
 {% block content %}
 <div style="max-width:420px;margin:0 auto;background:white;padding:30px;border-radius:12px;box-shadow:0 4px 10px rgba(0,0,0,0.1);">
     <h2 style="margin-top:0;text-align:center;color:#333;">Register</h2>
-    <p style="text-align:center;color:#666;margin-bottom:25px;">Create your account to start tracking finances.</p>
+    <p style="text-align:center;color:#666;margin-bottom:10px;">Create your account to start tracking finances.</p>
+    <p style="text-align:center;color:#666;margin-bottom:25px;font-size:14px;">Use at least 8 characters. No special format is required, but both password fields must match.</p>
 
     <form method="POST">
         <label for="username" style="display:block;margin-bottom:6px;color:#333;font-weight:bold;">Username</label>
         <input type="text" id="username" name="username" value="{{ request.form.get('username', '') }}" required style="width:100%;padding:10px;margin-bottom:10px;border-radius:5px;border:1px solid #ccc;box-sizing:border-box;">
 
         <label for="password" style="display:block;margin-bottom:6px;color:#333;font-weight:bold;">Password</label>
-        <input type="password" id="password" name="password" required style="width:100%;padding:10px;margin-bottom:20px;border-radius:5px;border:1px solid #ccc;box-sizing:border-box;">
+        <input type="password" id="password" name="password" minlength="8" required style="width:100%;padding:10px;margin-bottom:10px;border-radius:5px;border:1px solid #ccc;box-sizing:border-box;">
+
+        <label for="confirm_password" style="display:block;margin-bottom:6px;color:#333;font-weight:bold;">Confirm Password</label>
+        <input type="password" id="confirm_password" name="confirm_password" minlength="8" required style="width:100%;padding:10px;margin-bottom:20px;border-radius:5px;border:1px solid #ccc;box-sizing:border-box;">
 
         <button type="submit" style="width:100%;background:#2ecc71;color:white;padding:10px;border:none;border-radius:5px;cursor:pointer;font-size:16px;">Register</button>
     </form>

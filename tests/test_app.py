@@ -38,7 +38,11 @@ class FinanceTrackerTestCase(unittest.TestCase):
     def register(self, username="alice", password="secret123"):
         return self.client.post(
             "/register",
-            data={"username": username, "password": password},
+            data={
+                "username": username,
+                "password": password,
+                "confirm_password": password,
+            },
             follow_redirects=True,
         )
 
@@ -112,6 +116,28 @@ class FinanceTrackerTestCase(unittest.TestCase):
 
         duplicate = self.register()
         self.assertIn("Username already exists", duplicate.get_data(as_text=True))
+
+        mismatched = self.client.post(
+            "/register",
+            data={
+                "username": "charlie",
+                "password": "secret123",
+                "confirm_password": "different123",
+            },
+            follow_redirects=True,
+        )
+        self.assertIn("confirm password must match", mismatched.get_data(as_text=True))
+
+        short_password = self.client.post(
+            "/register",
+            data={
+                "username": "dave",
+                "password": "short",
+                "confirm_password": "short",
+            },
+            follow_redirects=True,
+        )
+        self.assertIn("Password must be at least 8 characters", short_password.get_data(as_text=True))
 
         bad_login = self.login(password="wrong-password")
         self.assertIn("Username or password is incorrect", bad_login.get_data(as_text=True))
@@ -358,6 +384,23 @@ class FinanceTrackerTestCase(unittest.TestCase):
         with app.app_context():
             budget = Budget.query.one()
             self.assertEqual(budget.amount, 5000)
+
+    def test_legacy_plain_text_password_is_upgraded_on_login(self):
+        self.create_user("legacy-user", password="legacy-pass-1")
+
+        with app.app_context():
+            user = User.query.filter_by(username="legacy-user").first()
+            user.password = "legacy-pass-1"
+            db.session.commit()
+
+        response = self.login("legacy-user", "legacy-pass-1")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("upgraded to the secure format", response.get_data(as_text=True))
+
+        with app.app_context():
+            user = User.query.filter_by(username="legacy-user").first()
+            self.assertNotEqual(user.password, "legacy-pass-1")
+            self.assertTrue(check_password_hash(user.password, "legacy-pass-1"))
 
 
 if __name__ == "__main__":
