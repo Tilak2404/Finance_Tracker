@@ -3,6 +3,42 @@
 {% block title %}Add Transaction | ExpenseStats{% endblock %}
 
 {% block content %}
+<style>
+    #calculator-modal {
+        position: fixed;
+        inset: 0;
+        display: none;
+        align-items: center;
+        justify-content: center;
+        padding: 20px;
+        background: rgba(2, 6, 23, 0.78);
+        backdrop-filter: blur(6px);
+        z-index: 1000;
+        opacity: 0;
+        transition: opacity 0.2s ease;
+    }
+
+    #calculator-modal.is-open {
+        display: flex;
+    }
+
+    #calculator-modal.is-visible {
+        opacity: 1;
+    }
+
+    #calculator-box {
+        width: min(92vw, 360px);
+        opacity: 0;
+        transform: translate(-50%, -50%) scale(0.96);
+        transition: transform 0.2s ease, opacity 0.2s ease;
+    }
+
+    #calculator-modal.is-visible #calculator-box {
+        opacity: 1;
+        transform: translate(-50%, -50%) scale(1);
+    }
+</style>
+
 <div style="max-width:500px;margin:0 auto;background:#020617;padding:32px;border-radius:16px;border:1px solid #1e293b;box-shadow:0 20px 40px rgba(0,0,0,0.5), 0 0 20px rgba(34,197,94,0.08);transition:all 0.2s ease;">
     <h2 style="margin-top:0;margin-bottom:10px;text-align:center;font-size:28px;display:inline-block;width:100%;background:linear-gradient(90deg, #f8fafc, #bbf7d0);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;">Add Transaction</h2>
     <p style="text-align:center;color:#94a3b8;margin-bottom:26px;line-height:1.7;">Enter a new income or expense record.</p>
@@ -23,7 +59,10 @@
         <p style="margin:0 0 14px 0;color:#94a3b8;font-size:12px;">Defaults to today's date.</p>
 
         <label for="amount" style="display:block;margin-bottom:8px;color:#cbd5e1;font-weight:600;">Amount</label>
-        <input type="number" id="amount" name="amount" step="0.01" min="0" value="{{ request.form.get('amount', '') }}" required style="width:100%;padding:12px;margin-bottom:14px;border-radius:8px;border:1px solid #334155;background:#1e293b;color:white;box-sizing:border-box;outline:none;transition:all 0.2s ease;">
+        <div style="display:flex;align-items:center;margin-bottom:14px;">
+            <input type="number" id="amount" name="amount" step="0.01" min="0" value="{{ request.form.get('amount', '') }}" required style="width:100%;padding:12px;border-radius:8px;border:1px solid #334155;background:#1e293b;color:white;box-sizing:border-box;outline:none;transition:all 0.2s ease;">
+            <span id="calculator-toggle" role="button" tabindex="0" aria-label="Open calculator" title="Open calculator" style="cursor:pointer;color:#22c55e;margin-left:10px;font-size:24px;line-height:1;">🧮</span>
+        </div>
 
         {% if type == 'expense' %}
         <label for="category" style="display:block;margin-bottom:8px;color:#cbd5e1;font-weight:600;">Category</label>
@@ -53,4 +92,160 @@
         <a href="/" style="color:#22c55e;text-decoration:none;transition:all 0.2s ease;">Back to Dashboard</a>
     </div>
 </div>
+
+<div id="calculator-modal" aria-hidden="true">
+    <div id="calculator-box" style="
+        position:fixed;
+        top:50%;
+        left:50%;
+        background:#020617;
+        padding:20px;
+        border-radius:12px;
+        border:1px solid #1e293b;
+        box-shadow:0 20px 40px rgba(0,0,0,0.7);
+    ">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+            <strong style="color:#f8fafc;font-size:16px;">Quick Calculator</strong>
+            <button type="button" id="calculator-close" aria-label="Close calculator" style="background:none;border:none;color:#94a3b8;font-size:22px;cursor:pointer;line-height:1;padding:0;">&times;</button>
+        </div>
+
+        <input type="text" id="calculator-expression" placeholder="Enter calculation" autocomplete="off" style="
+            width:100%;
+            padding:10px;
+            margin-bottom:10px;
+            background:#1e293b;
+            color:white;
+            border-radius:8px;
+            border:1px solid #334155;
+            box-sizing:border-box;
+            outline:none;
+        ">
+
+        <button type="button" id="calculator-submit" style="
+            width:100%;
+            background:#22c55e;
+            padding:10px;
+            border:none;
+            border-radius:8px;
+            color:black;
+            cursor:pointer;
+            font-weight:600;
+        ">
+            Calculate
+        </button>
+
+        <p style="margin:12px 0 0 0;color:#94a3b8;font-size:12px;">Use +, -, *, /, % and parentheses.</p>
+        <p id="calculator-error" style="min-height:18px;margin:10px 0 0 0;color:#fca5a5;font-size:13px;"></p>
+    </div>
+</div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const calculatorToggle = document.getElementById("calculator-toggle");
+        const calculatorModal = document.getElementById("calculator-modal");
+        const calculatorClose = document.getElementById("calculator-close");
+        const calculatorSubmit = document.getElementById("calculator-submit");
+        const calculatorExpression = document.getElementById("calculator-expression");
+        const calculatorError = document.getElementById("calculator-error");
+        const amountInput = document.getElementById("amount");
+        let closeTimer = null;
+
+        function clearCalculatorError() {
+            calculatorError.textContent = "";
+        }
+
+        function openCalculator() {
+            window.clearTimeout(closeTimer);
+            clearCalculatorError();
+            calculatorModal.classList.add("is-open");
+            calculatorModal.setAttribute("aria-hidden", "false");
+
+            window.requestAnimationFrame(function () {
+                calculatorModal.classList.add("is-visible");
+            });
+
+            calculatorExpression.value = amountInput.value || "";
+            document.body.style.overflow = "hidden";
+            window.setTimeout(function () {
+                calculatorExpression.focus();
+                calculatorExpression.select();
+            }, 40);
+        }
+
+        function closeCalculator() {
+            calculatorModal.classList.remove("is-visible");
+            calculatorModal.setAttribute("aria-hidden", "true");
+            document.body.style.overflow = "";
+            closeTimer = window.setTimeout(function () {
+                calculatorModal.classList.remove("is-open");
+            }, 180);
+        }
+
+        async function calculateAmount() {
+            clearCalculatorError();
+            calculatorSubmit.disabled = true;
+            calculatorSubmit.textContent = "Calculating...";
+
+            try {
+                const response = await fetch("/calculate", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "X-Requested-With": "XMLHttpRequest"
+                    },
+                    body: JSON.stringify({ expression: calculatorExpression.value.trim() })
+                });
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(data.error || "Unable to calculate.");
+                }
+
+                amountInput.value = data.formatted_result;
+                amountInput.dispatchEvent(new Event("input", { bubbles: true }));
+                closeCalculator();
+                amountInput.focus();
+            } catch (error) {
+                calculatorError.textContent = error.message;
+            } finally {
+                calculatorSubmit.disabled = false;
+                calculatorSubmit.textContent = "Calculate";
+            }
+        }
+
+        calculatorToggle.addEventListener("click", openCalculator);
+        calculatorToggle.addEventListener("keydown", function (event) {
+            if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
+                openCalculator();
+            }
+        });
+
+        calculatorClose.addEventListener("click", closeCalculator);
+        calculatorSubmit.addEventListener("click", calculateAmount);
+
+        calculatorExpression.addEventListener("keydown", function (event) {
+            if (event.key === "Enter") {
+                event.preventDefault();
+                calculateAmount();
+            }
+
+            if (event.key === "Escape" && calculatorModal.classList.contains("is-open")) {
+                closeCalculator();
+            }
+        });
+
+        calculatorModal.addEventListener("click", function (event) {
+            if (event.target === calculatorModal) {
+                closeCalculator();
+            }
+        });
+
+        document.addEventListener("keydown", function (event) {
+            if (event.key === "Escape" && calculatorModal.classList.contains("is-open")) {
+                closeCalculator();
+            }
+        });
+    });
+</script>
 {% endblock %}

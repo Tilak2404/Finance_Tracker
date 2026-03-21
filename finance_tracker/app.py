@@ -1,16 +1,20 @@
+import ast
+import calendar
+import math
 import os
 import shutil
 from datetime import UTC, datetime, timedelta
+from urllib.parse import urlencode
 
 import matplotlib
-from flask import Flask, flash, redirect, render_template, request, send_file, session
+from flask import Flask, flash, jsonify, redirect, render_template, request, send_file, session
 from flask_sqlalchemy import SQLAlchemy
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 from sqlalchemy import func, inspect, text
-from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.exc import IntegrityError, OperationalError, SQLAlchemyError
 from werkzeug.security import check_password_hash, generate_password_hash
 
 matplotlib.use("Agg")
@@ -20,6 +24,7 @@ import matplotlib.pyplot as plt
 app = Flask(__name__)
 app.secret_key = "your_secret_key"
 DEFAULT_DATABASE_PATH = os.path.join(app.root_path, "finance.db")
+DEFAULT_FAVICON_PATH = os.path.join(app.static_folder, "favicon.svg")
 app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{DEFAULT_DATABASE_PATH}"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
@@ -46,6 +51,17 @@ CATEGORY_CHART_COLORS = {
     "Entertainment": "#f59e0b",
     "Health": "#22c55e",
     "Miscellaneous": "#94a3b8",
+}
+ALLOWED_CALCULATOR_BINARY_OPERATORS = {
+    ast.Add: lambda left, right: left + right,
+    ast.Sub: lambda left, right: left - right,
+    ast.Mult: lambda left, right: left * right,
+    ast.Div: lambda left, right: left / right,
+    ast.Mod: lambda left, right: left % right,
+}
+ALLOWED_CALCULATOR_UNARY_OPERATORS = {
+    ast.UAdd: lambda value: value,
+    ast.USub: lambda value: -value,
 }
 
 
@@ -150,6 +166,14 @@ def initialize_database():
     ensure_database_ready()
 
 
+@app.route("/favicon.ico")
+def favicon():
+    if os.path.exists(DEFAULT_FAVICON_PATH):
+        return app.send_static_file("favicon.svg")
+
+    return "", 204
+
+
 def parse_transaction_form(form, default_date=None):
     amount_text = form.get("amount", "").strip()
     transaction_type = form["type"].strip()
@@ -196,6 +220,60 @@ def parse_transaction_form(form, default_date=None):
         "tags": tags,
         "date": parsed_date,
     }, None
+
+
+def evaluate_calculation_expression(expression):
+    normalized_expression = expression.strip()
+    if not normalized_expression:
+        raise ValueError("Enter a calculation first.")
+
+    try:
+        parsed_expression = ast.parse(normalized_expression, mode="eval")
+    except SyntaxError as exc:
+        raise ValueError("Invalid calculation.") from exc
+
+    def evaluate_node(node):
+        if isinstance(node, ast.Expression):
+            return evaluate_node(node.body)
+
+        if isinstance(node, ast.Constant) and isinstance(node.value, (int, float)):
+            if isinstance(node.value, bool):
+                raise ValueError("Invalid calculation.")
+            return float(node.value)
+
+        if isinstance(node, ast.BinOp):
+            operation = ALLOWED_CALCULATOR_BINARY_OPERATORS.get(type(node.op))
+            if operation is None:
+                raise ValueError("Only +, -, *, /, and % are allowed.")
+
+            left_value = evaluate_node(node.left)
+            right_value = evaluate_node(node.right)
+            try:
+                result = operation(left_value, right_value)
+            except ZeroDivisionError as exc:
+                raise ValueError("Division by zero is not allowed.") from exc
+
+            if not math.isfinite(result):
+                raise ValueError("Result must be a finite number.")
+            return result
+
+        if isinstance(node, ast.UnaryOp):
+            operation = ALLOWED_CALCULATOR_UNARY_OPERATORS.get(type(node.op))
+            if operation is None:
+                raise ValueError("Invalid calculation.")
+
+            result = operation(evaluate_node(node.operand))
+            if not math.isfinite(result):
+                raise ValueError("Result must be a finite number.")
+            return result
+
+        raise ValueError("Invalid calculation.")
+
+    result = round(evaluate_node(parsed_expression), 2)
+    if result <= 0:
+        raise ValueError("Amount must be greater than 0.")
+
+    return result
 
 
 def generate_donut_chart(expense_transactions, balance):
@@ -370,48 +448,266 @@ def build_insights(filtered_expense_transactions, all_expense_transactions):
     return insights
 
 
-def generate_pdf_report(transactions, total_income, total_expense, balance):
-    report_path = os.path.join(app.root_path, "report.pdf")
-    document = SimpleDocTemplate(report_path, pagesize=letter)
+def calculate_future_projection(transactions):
+    monthly_totals = {}
+
+    for transaction in transactions:
+        transaction_date = transaction.date or utc_now()
+        month_key = transaction_date.strftime("%Y-%m")
+        monthly_bucket = monthly_totals.setdefault(month_key, {"income": 0.0, "expense": 0.0})
+
+        if transaction.type == "income":
+            monthly_bucket["income"] += transaction.amount
+        elif transaction.type == "expense":
+            monthly_bucket["expense"] += transaction.amount
+
+    month_count = len(monthly_totals)
+    if month_count:
+        average_monthly_income = sum(
+            bucket["income"] for bucket in monthly_totals.values()
+        ) / month_count
+        average_monthly_expense = sum(
+            bucket["expense"] for bucket in monthly_totals.values()
+        ) / month_count
+    else:
+        average_monthly_income = 0.0
+        average_monthly_expense = 0.0
+
+    monthly_savings = average_monthly_income - average_monthly_expense
+
+    return {
+        "average_monthly_income": round(average_monthly_income, 2),
+        "average_monthly_expense": round(average_monthly_expense, 2),
+        "monthly_savings": round(monthly_savings, 2),
+        "six_month_projection": round(monthly_savings * 6, 2),
+        "yearly_savings": round(monthly_savings * 12, 2),
+        "months_tracked": month_count,
+    }
+
+
+def build_dashboard_redirect_url(base_path="/", filter_date="", filter_month="", month=None, year=None):
+    if base_path not in {"/", "/dashboard"}:
+        base_path = "/"
+
+    query_params = {}
+
+    if filter_date:
+        query_params["filter_date"] = filter_date
+    if filter_month:
+        query_params["filter_month"] = filter_month
+    if month:
+        query_params["month"] = month
+    if year:
+        query_params["year"] = year
+
+    if not query_params:
+        return base_path
+
+    return f"{base_path}?{urlencode(query_params)}"
+
+
+def build_spending_heatmap(user_id, month, year, date_map=None):
+    first_weekday, num_days = calendar.monthrange(year, month)
+    if date_map is None:
+        grouped_expenses = (
+            db.session.query(
+                func.date(Transaction.date).label("expense_date"),
+                func.sum(Transaction.amount).label("daily_total"),
+            )
+            .filter(
+                Transaction.user_id == user_id,
+                Transaction.type == "expense",
+                func.strftime("%m", Transaction.date) == f"{month:02d}",
+                func.strftime("%Y", Transaction.date) == str(year),
+            )
+            .group_by(func.date(Transaction.date))
+            .all()
+        )
+        date_map = {
+            row.expense_date: round(float(row.daily_total or 0.0), 2) for row in grouped_expenses
+        }
+    max_total = max(date_map.values(), default=0.0)
+
+    if month == 1:
+        prev_month = 12
+        prev_year = year - 1
+    else:
+        prev_month = month - 1
+        prev_year = year
+
+    if month == 12:
+        next_month = 1
+        next_year = year + 1
+    else:
+        next_month = month + 1
+        next_year = year
+
+    cells = [{"is_padding": True} for _ in range(first_weekday)]
+    for day in range(1, num_days + 1):
+        date_str = f"{year}-{month:02d}-{day:02d}"
+        amount = date_map.get(date_str, 0.0)
+
+        if amount == 0:
+            color = "#020617"
+            text_color = "#94a3b8"
+        elif amount < 500:
+            color = "#14532d"
+            text_color = "#dcfce7"
+        elif amount < 2000:
+            color = "#22c55e"
+            text_color = "#052e16"
+        else:
+            color = "#4ade80"
+            text_color = "#052e16"
+
+        cells.append(
+            {
+                "is_padding": False,
+                "day": day,
+                "date_label": date_str,
+                "amount": amount,
+                "color": color,
+                "text_color": text_color,
+            }
+        )
+
+    while len(cells) % 7 != 0:
+        cells.append({"is_padding": True})
+
+    return {
+        "weekday_labels": ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"],
+        "cells": cells,
+        "month": month,
+        "year": year,
+        "month_name": calendar.month_name[month],
+        "prev_month": prev_month,
+        "prev_year": prev_year,
+        "next_month": next_month,
+        "next_year": next_year,
+        "max_total": round(max_total, 2),
+    }
+
+
+def get_recent_transactions_for_report(user_id, limit=20):
+    return (
+        Transaction.query.filter_by(user_id=user_id)
+        .order_by(Transaction.date.desc(), Transaction.id.desc())
+        .limit(limit)
+        .all()
+    )
+
+
+def build_report_rows(transactions, final_balance):
+    running_balance = round(final_balance, 2)
+    report_rows = []
+
+    for transaction in transactions:
+        report_rows.append(
+            {
+                "date": transaction.date.strftime("%Y-%m-%d") if transaction.date else "Unknown",
+                "type": transaction.type.title(),
+                "category": transaction.category or "Miscellaneous",
+                "amount": round(transaction.amount, 2),
+                "balance_after": round(running_balance, 2),
+            }
+        )
+
+        if transaction.type == "expense":
+            running_balance = round(running_balance + transaction.amount, 2)
+        else:
+            running_balance = round(running_balance - transaction.amount, 2)
+
+    return report_rows
+
+
+def build_pdf_report_elements(report_rows, total_income, total_expense, balance):
     styles = getSampleStyleSheet()
     elements = []
 
-    elements.append(Paragraph("Finance Report", styles["Title"]))
+    elements.append(Paragraph("ExpenseStats Report", styles["Title"]))
     elements.append(Spacer(1, 12))
-    elements.append(Paragraph(f"Total Income: Rs {total_income:.2f}", styles["Normal"]))
-    elements.append(Paragraph(f"Total Expense: Rs {total_expense:.2f}", styles["Normal"]))
-    elements.append(Paragraph(f"Balance: Rs {balance:.2f}", styles["Normal"]))
-    elements.append(Spacer(1, 16))
+    elements.append(Paragraph("Summary", styles["Heading2"]))
+    elements.append(Spacer(1, 8))
 
-    table_data = [["Amount", "Category", "Type"]]
-    for transaction in transactions:
+    summary_table = Table(
+        [
+            ["Total Income", f"Rs {total_income:.2f}"],
+            ["Total Expense", f"Rs {total_expense:.2f}"],
+            ["Final Balance", f"Rs {balance:.2f}"],
+        ],
+        colWidths=[170, 130],
+        hAlign="LEFT",
+    )
+    summary_table.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f8fafc")),
+                ("TEXTCOLOR", (0, 0), (-1, -1), colors.HexColor("#0f172a")),
+                ("GRID", (0, 0), (-1, -1), 0.75, colors.HexColor("#cbd5e1")),
+                ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+                ("ALIGN", (0, 0), (0, -1), "LEFT"),
+                ("ALIGN", (1, 0), (1, -1), "RIGHT"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 10),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 10),
+                ("TOPPADDING", (0, 0), (-1, -1), 7),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+            ]
+        )
+    )
+    elements.append(summary_table)
+    elements.append(Spacer(1, 18))
+    elements.append(Paragraph("Last 20 Transactions", styles["Heading2"]))
+    elements.append(Spacer(1, 8))
+
+    table_data = [["Date", "Type", "Category", "Amount", "Balance After"]]
+    for row in report_rows:
         table_data.append(
             [
-                f"Rs {transaction.amount:.2f}",
-                transaction.category or "Miscellaneous",
-                transaction.type.title(),
+                row["date"],
+                row["type"],
+                row["category"],
+                f"Rs {row['amount']:.2f}",
+                f"Rs {row['balance_after']:.2f}",
             ]
         )
 
     if len(table_data) == 1:
         elements.append(Paragraph("No transactions available.", styles["Normal"]))
-    else:
-        table = Table(table_data, colWidths=[120, 180, 120])
-        table.setStyle(
-            TableStyle(
-                [
-                    ("BACKGROUND", (0, 0), (-1, 0), colors.lightgrey),
-                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.black),
-                    ("GRID", (0, 0), (-1, -1), 1, colors.grey),
-                    ("ALIGN", (0, 0), (-1, -1), "LEFT"),
-                    ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
-                    ("BOTTOMPADDING", (0, 0), (-1, 0), 8),
-                    ("BACKGROUND", (0, 1), (-1, -1), colors.whitesmoke),
-                ]
-            )
-        )
-        elements.append(table)
+        return elements
 
+    transactions_table = Table(
+        table_data,
+        colWidths=[80, 68, 132, 90, 110],
+        repeatRows=1,
+        hAlign="LEFT",
+    )
+    transactions_table.setStyle(
+        TableStyle(
+            [
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0f172a")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+                ("GRID", (0, 0), (-1, -1), 0.75, colors.HexColor("#cbd5e1")),
+                ("BACKGROUND", (0, 1), (-1, -1), colors.HexColor("#f8fafc")),
+                ("TEXTCOLOR", (0, 1), (-1, -1), colors.HexColor("#111827")),
+                ("ALIGN", (0, 0), (2, -1), "LEFT"),
+                ("ALIGN", (3, 0), (4, -1), "RIGHT"),
+                ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                ("LEFTPADDING", (0, 0), (-1, -1), 8),
+                ("RIGHTPADDING", (0, 0), (-1, -1), 8),
+                ("TOPPADDING", (0, 0), (-1, -1), 7),
+                ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+            ]
+        )
+    )
+    elements.append(transactions_table)
+    return elements
+
+
+def generate_pdf_report(report_rows, total_income, total_expense, balance):
+    report_path = os.path.join(app.root_path, "report.pdf")
+    document = SimpleDocTemplate(report_path, pagesize=letter, leftMargin=36, rightMargin=36)
+    elements = build_pdf_report_elements(report_rows, total_income, total_expense, balance)
     document.build(elements)
     return report_path
 
@@ -448,8 +744,29 @@ def register():
             user = User(username=username, password=hashed_password)
             db.session.add(user)
             db.session.commit()
+        except IntegrityError as exc:
+            db.session.rollback()
+            error_text = str(getattr(exc, "orig", exc)).lower()
+            if "unique constraint failed: user.username" in error_text:
+                flash("Invalid input. Username already exists.", "error")
+            else:
+                app.logger.warning(
+                    "Account creation integrity error for username %s: %s", username, exc
+                )
+                flash("Something went wrong while creating the account. Please try again.", "error")
+            return render_template("register.html", error=None)
+        except OperationalError as exc:
+            db.session.rollback()
+            error_text = str(getattr(exc, "orig", exc)).lower()
+            if "database is locked" in error_text:
+                flash("The database is busy right now. Please try again in a moment.", "error")
+            else:
+                flash("Something went wrong while creating the account. Please try again.", "error")
+            app.logger.warning("Account creation operational error for username %s: %s", username, exc)
+            return render_template("register.html", error=None)
         except SQLAlchemyError:
             db.session.rollback()
+            app.logger.exception("Account creation failed for username %s", username)
             flash("Something went wrong while creating the account. Please try again.", "error")
             return render_template("register.html", error=None)
 
@@ -506,20 +823,32 @@ def set_budget():
     if "user_id" not in session:
         return redirect("/login")
 
+    dashboard_path = request.form.get("dashboard_path", "/")
+    filter_date = request.form.get("filter_date", "")
+    filter_month = request.form.get("filter_month", "")
+    dashboard_month = request.form.get("month", "")
+    dashboard_year = request.form.get("year", "")
+    dashboard_url = build_dashboard_redirect_url(
+        base_path=dashboard_path,
+        filter_date=filter_date,
+        filter_month=filter_month,
+        month=dashboard_month,
+        year=dashboard_year,
+    )
     budget_amount = request.form.get("budget_amount", "").strip()
     if not budget_amount:
         flash("Invalid input. Budget amount is required.", "error")
-        return redirect("/")
+        return redirect(dashboard_url)
 
     try:
         amount = float(budget_amount)
     except ValueError:
         flash("Invalid input. Budget must be a number.", "error")
-        return redirect("/")
+        return redirect(dashboard_url)
 
     if amount <= 0:
         flash("Invalid input. Budget must be greater than 0.", "error")
-        return redirect("/")
+        return redirect(dashboard_url)
 
     try:
         budget = Budget.query.filter_by(user_id=session["user_id"]).first()
@@ -533,19 +862,13 @@ def set_budget():
     except SQLAlchemyError:
         db.session.rollback()
         flash("Something went wrong. Please try again.", "error")
-        return redirect("/")
+        return redirect(dashboard_url)
 
     flash("Budget saved successfully.", "success")
-
-    filter_date = request.form.get("filter_date", "")
-    filter_month = request.form.get("filter_month", "")
-    if filter_date:
-        return redirect(f"/?filter_date={filter_date}")
-    if filter_month:
-        return redirect(f"/?filter_month={filter_month}")
-    return redirect("/")
+    return redirect(dashboard_url)
 
 
+@app.route("/dashboard")
 @app.route("/")
 def index():
     if "user_id" not in session:
@@ -553,8 +876,19 @@ def index():
 
     filter_date = request.args.get("filter_date", "")
     filter_month = request.args.get("filter_month", "")
+    today = utc_now().date()
 
     try:
+        heatmap_month = int(request.args.get("month", today.month))
+        heatmap_year = int(request.args.get("year", today.year))
+        if heatmap_month < 1 or heatmap_month > 12 or heatmap_year < 1:
+            raise ValueError
+    except ValueError:
+        heatmap_month = today.month
+        heatmap_year = today.year
+
+    try:
+        all_transactions = Transaction.query.filter_by(user_id=session["user_id"]).all()
         all_expense_transactions = Transaction.query.filter_by(
             user_id=session["user_id"], type="expense"
         ).all()
@@ -601,6 +935,8 @@ def index():
         remaining_budget = budget.amount - total_expense if budget else None
         budget_exceeded = budget is not None and total_expense > budget.amount
         insights = build_insights(expense_transactions, all_expense_transactions)
+        future_projection = calculate_future_projection(all_transactions)
+        spending_heatmap = build_spending_heatmap(session["user_id"], heatmap_month, heatmap_year)
         generate_donut_chart(expense_transactions, balance)
         generate_trend_chart(expense_transactions)
     except Exception:
@@ -614,6 +950,13 @@ def index():
         remaining_budget = None
         budget_exceeded = False
         insights = ["Something went wrong."]
+        future_projection = calculate_future_projection([])
+        spending_heatmap = build_spending_heatmap(
+            None,
+            heatmap_month,
+            heatmap_year,
+            date_map={},
+        )
 
     return render_template(
         "index.html",
@@ -628,7 +971,31 @@ def index():
         remaining_budget=remaining_budget,
         budget_exceeded=budget_exceeded,
         insights=insights,
+        future_projection=future_projection,
+        spending_heatmap=spending_heatmap,
     )
+
+
+@app.route("/calculate", methods=["POST"])
+def calculate_amount():
+    if "user_id" not in session:
+        return jsonify({"error": "Login required."}), 401
+
+    payload = request.get_json(silent=True)
+    if payload is None:
+        payload = request.form
+
+    if not hasattr(payload, "get"):
+        return jsonify({"error": "Invalid calculation."}), 400
+
+    expression = str(payload.get("expression", "")).strip()
+
+    try:
+        result = evaluate_calculation_expression(expression)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
+    return jsonify({"result": result, "formatted_result": f"{result:.2f}"})
 
 
 @app.route("/add", methods=["GET", "POST"])
@@ -772,20 +1139,22 @@ def download_report():
         return redirect("/login")
 
     try:
-        transactions = (
-            Transaction.query.filter_by(user_id=session["user_id"])
-            .order_by(Transaction.date.desc())
-            .all()
+        user_id = session["user_id"]
+        report_transactions = get_recent_transactions_for_report(user_id)
+        total_income = (
+            db.session.query(func.coalesce(func.sum(Transaction.amount), 0.0))
+            .filter_by(user_id=user_id, type="income")
+            .scalar()
         )
-        total_income = sum(
-            transaction.amount for transaction in transactions if transaction.type == "income"
-        )
-        total_expense = sum(
-            transaction.amount for transaction in transactions if transaction.type == "expense"
+        total_expense = (
+            db.session.query(func.coalesce(func.sum(Transaction.amount), 0.0))
+            .filter_by(user_id=user_id, type="expense")
+            .scalar()
         )
         balance = total_income - total_expense
+        report_rows = build_report_rows(report_transactions, balance)
 
-        report_path = generate_pdf_report(transactions, total_income, total_expense, balance)
+        report_path = generate_pdf_report(report_rows, total_income, total_expense, balance)
     except Exception:
         flash("Something went wrong while generating the report.", "error")
         return redirect("/")
