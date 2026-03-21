@@ -1,5 +1,7 @@
 __pycache__/
 *.pyc
+*.db
+.env
 finance_tracker/instance/
 finance_tracker/static/chart.png
 finance_tracker/static/trend.png
