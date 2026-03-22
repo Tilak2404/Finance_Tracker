@@ -22,7 +22,8 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 app = Flask(__name__)
-app.secret_key = "your_secret_key"
+import secrets
+app.secret_key = os.environ.get('SECRET_KEY') or secrets.token_hex(32)
 DEFAULT_DATABASE_PATH = os.path.join(app.root_path, "finance.db")
 DEFAULT_FAVICON_PATH = os.path.join(app.static_folder, "favicon.svg")
 app.config["SQLALCHEMY_DATABASE_URI"] = f"sqlite:///{DEFAULT_DATABASE_PATH}"
