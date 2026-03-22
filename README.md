@@ -1,81 +1,149 @@
-# Finance Tracker
+# 💰 ExpenseStats
 
-A basic Flask finance tracker with:
+### *Your spending, decoded.*
 
-- user registration and login
-- transaction add, edit, and delete
-- dashboard summary for income, expense, and balance
-- backend-generated pie chart using `matplotlib`
+🔗 Live Demo: https://expensestats.onrender.com/
 
-This project is intended as a simple learning project, so authentication is intentionally basic and passwords are currently stored in plain text.
+---
 
-## Project Structure
+## 📌 Overview
 
-```text
-finance_tracker/
-|-- app.py
-|-- static/
-`-- templates/
+**ExpenseStats** is a data-driven personal finance web application that helps users track, analyze, and understand their spending patterns through intuitive visualizations and intelligent insights.
+
+Built with a focus on clarity and usability, the application transforms raw financial data into meaningful information, enabling better financial decisions.
+
+---
+
+## 🚀 Features
+
+### 🔐 Authentication
+
+* Secure user login & registration
+* Session-based access control
+
+### 💸 Expense & Income Tracking
+
+* Add, edit, and delete transactions
+* Category-based expense management
+* Smart date handling (defaults to current date)
+
+### 📊 Data Visualization
+
+* Donut chart for category-wise spending
+* Monthly expense heatmap (calendar-based)
+* Trend analysis using charts
+
+### 🧠 Smart Insights
+
+* Budget tracking and alerts
+* Spending patterns visualization
+* Future savings projection
+
+### 🧾 PDF Reports
+
+* Downloadable financial reports
+* Includes last 20 transactions
+* Running balance calculation
+
+### 🎯 UX Enhancements
+
+* Dark theme (black + green fintech UI)
+* Scrollable transaction panel
+* Calculator for quick expense entry
+* Responsive dashboard layout
+
+---
+
+## 🛠️ Tech Stack
+
+* **Backend:** Flask (Python)
+* **Frontend:** HTML, Inline CSS
+* **Database:** SQLite
+* **Charts:** Matplotlib
+* **PDF Generation:** ReportLab
+* **Deployment:** Render
+
+---
+
+## 📂 Project Structure
+
+```
+project/
+│── app.py
+│── requirements.txt
+│── Procfile
+│── templates/
+│── static/
 ```
 
-## Requirements
+---
 
-- Python 3.x
-- Flask
-- Flask-SQLAlchemy
-- matplotlib
+## ⚙️ Installation & Setup
 
-## Installation
+1. Clone the repository:
 
-```bash
+```
+git clone https://github.com/your-username/expensestats.git
+cd expensestats
+```
+
+2. Install dependencies:
+
+```
 pip install -r requirements.txt
 ```
 
-## Run the App
+3. Run the app:
 
-From the project root:
-
-```bash
-cd finance_tracker
+```
 python app.py
 ```
 
-Open:
+4. Open in browser:
 
-```text
-http://127.0.0.1:5000/
+```
+http://127.0.0.1:5000
 ```
 
-## Create the Database
+---
 
-Run this once before using the app:
+## 🌐 Deployment
 
-```bash
-cd finance_tracker
-python
-```
+The application is deployed on **Render**:
 
-Then in the Python shell:
+🔗 https://expensestats.onrender.com/
 
-```python
-from app import app, db
-with app.app_context():
-    db.create_all()
-```
+---
 
-## Main Routes
+## ⚠️ Notes
 
-- `/register` - create a user account
-- `/login` - login page
-- `/logout` - logout
-- `/` - dashboard
-- `/add` - add transaction
-- `/edit/<id>` - edit transaction
-- `/delete/<id>` - delete transaction
-- `/chart` - view income vs expense pie chart
+* SQLite is used for simplicity; data may reset on redeployment.
+* Designed as a full-stack project for learning and demonstration purposes.
 
-## Notes
+---
 
-- SQLite database file is created automatically by SQLAlchemy
-- pie chart image is generated in `finance_tracker/static/chart.png`
-- this project is for learning/demo purposes
+## 💡 Future Improvements
+
+* PostgreSQL integration for persistent data
+* Advanced analytics & predictions
+* Mobile responsiveness improvements
+* API integration (banking data)
+
+---
+
+## 👤 Author
+
+Developed as a full-stack project showcasing:
+
+* Backend development
+* UI/UX design
+* Data visualization
+* Product thinking
+
+---
+
+## ⭐ If you like this project
+
+Give it a star ⭐ and feel free to contribute!
+
+---
