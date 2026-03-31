@@ -11,47 +11,248 @@
     background: #22c55e;
     border-radius: 10px;
 }
+.dashboard-chip {
+    display:inline-flex;
+    align-items:center;
+    gap:6px;
+    padding:7px 11px;
+    border-radius:999px;
+    background:#123524;
+    color:#86efac;
+    border:1px solid #166534;
+    font-size:12px;
+    font-weight:600;
+}
+
+.dashboard-main-column {
+    min-width: 0;
+}
+
+@media (max-width: 960px) {
+    .dashboard-main-layout,
+    .dashboard-summary-layout {
+        flex-direction: column !important;
+    }
+
+    .dashboard-main-column,
+    .dashboard-overview-card,
+    .dashboard-summary-card,
+    .dashboard-heatmap-card {
+        width: 100% !important;
+        min-width: 0 !important;
+    }
+}
+
+@media (max-width: 720px) {
+    .dashboard-hero {
+        padding: 18px !important;
+        border-radius: 16px !important;
+    }
+
+    .dashboard-hero-title {
+        font-size: 20px !important;
+        line-height: 1.18 !important;
+    }
+
+    .dashboard-hero-copy {
+        font-size: 14px !important;
+        line-height: 1.65 !important;
+    }
+
+    .dashboard-hero-actions {
+        width: 100% !important;
+        display: grid !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: 10px !important;
+    }
+
+    .dashboard-hero-actions a,
+    .dashboard-overview-actions a {
+        width: 100% !important;
+        text-align: center !important;
+        box-sizing: border-box !important;
+    }
+
+    .dashboard-hero-actions a:last-child {
+        grid-column: 1 / -1;
+    }
+
+    .dashboard-active-filters,
+    .dashboard-filter-card {
+        padding: 16px !important;
+    }
+
+    .dashboard-stat-grid,
+    .dashboard-mini-grid {
+        grid-template-columns: 1fr !important;
+    }
+
+    .dashboard-section-split,
+    .dashboard-summary-layout {
+        gap: 16px !important;
+    }
+
+    .dashboard-budget-card,
+    .dashboard-transactions-card,
+    .dashboard-overview-card,
+    .dashboard-summary-card,
+    .dashboard-heatmap-card {
+        width: 100% !important;
+        min-width: 0 !important;
+        padding: 16px !important;
+        box-sizing: border-box !important;
+    }
+
+    .dashboard-transactions-header,
+    .dashboard-heatmap-nav {
+        flex-direction: column !important;
+        align-items: flex-start !important;
+    }
+
+    .dashboard-transaction-row {
+        flex-direction: column !important;
+    }
+
+    .dashboard-transaction-side {
+        width: 100% !important;
+        text-align: left !important;
+    }
+
+    .dashboard-transaction-actions {
+        justify-content: flex-start !important;
+    }
+
+    .dashboard-filter-form {
+        flex-direction: column !important;
+        align-items: stretch !important;
+        gap: 12px !important;
+    }
+
+    .dashboard-filter-field {
+        width: 100% !important;
+        min-width: 0 !important;
+    }
+
+    .dashboard-filter-actions,
+    .dashboard-overview-actions {
+        width: 100% !important;
+        display: grid !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: 10px !important;
+    }
+
+    .dashboard-filter-actions > * {
+        width: 100% !important;
+        text-align: center !important;
+        box-sizing: border-box !important;
+    }
+}
+
+@media (max-width: 520px) {
+    .dashboard-hero-actions,
+    .dashboard-filter-actions,
+    .dashboard-overview-actions {
+        grid-template-columns: 1fr !important;
+    }
+
+    .dashboard-stat-card h2 {
+        font-size: 24px !important;
+    }
+
+    .dashboard-heatmap-grid {
+        gap: 4px !important;
+    }
+
+    .dashboard-heatmap-label {
+        font-size: 10px !important;
+    }
+
+    .dashboard-heatmap-cell,
+    .dashboard-heatmap-padding {
+        height: 38px !important;
+    }
+
+    .dashboard-heatmap-cell {
+        font-size: 11px !important;
+    }
+
+    .dashboard-heatmap-month {
+        min-width: 0 !important;
+        font-size: 18px !important;
+    }
+}
 </style>
 
-<div style="display:flex;gap:20px;flex-wrap:wrap;align-items:stretch;">
-    <div style="flex:1;min-width:300px;">
-        <div style="display:grid;grid-template-columns:repeat(2, minmax(0, 1fr));gap:16px;">
-            <div style="background:#020617;border-radius:12px;padding:20px;border:1px solid #1e293b;box-shadow:0 10px 25px rgba(0,0,0,0.5);transition:all 0.2s ease;">
+<div class="dashboard-hero" style="background:radial-gradient(circle at top right, rgba(34,197,94,0.18), rgba(2,6,23,0) 42%), #020617;border-radius:18px;padding:24px;border:1px solid #1e293b;box-shadow:0 14px 30px rgba(0,0,0,0.45);margin-bottom:20px;display:flex;justify-content:space-between;gap:18px;flex-wrap:wrap;align-items:center;">
+    <div style="max-width:700px;">
+        <span style="display:inline-block;margin-bottom:8px;color:#86efac;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;">Finance Command Center</span>
+        <h2 class="dashboard-hero-title" style="margin:0;color:#f8fafc;font-size:30px;line-height:1.15;">Sharper dashboard filters, export-ready views, and a clearer monthly snapshot.</h2>
+        <p class="dashboard-hero-copy" style="margin:10px 0 0 0;color:#94a3b8;line-height:1.7;">Search your notes and tags, inspect {{ monthly_snapshot.month_label }}, and compare current spending pace against your budget without leaving the dashboard.</p>
+    </div>
+    <div class="dashboard-hero-actions" style="display:flex;gap:10px;flex-wrap:wrap;">
+        <a href="/add" style="display:inline-block;background:#22c55e;color:black;padding:11px 16px;border-radius:10px;text-decoration:none;font-weight:600;box-shadow:0 12px 24px rgba(34,197,94,0.18);">Add Transaction</a>
+        <a href="{{ download_csv_url }}" style="display:inline-block;background:#1e293b;color:white;padding:11px 16px;border-radius:10px;text-decoration:none;border:1px solid #334155;">Export CSV</a>
+        <a href="/download_report" style="display:inline-block;background:#1e293b;color:white;padding:11px 16px;border-radius:10px;text-decoration:none;border:1px solid #334155;">Download Report</a>
+    </div>
+</div>
+
+{% if active_filters %}
+<div class="dashboard-active-filters" style="background:#020617;border-radius:14px;padding:18px 20px;border:1px solid #1e293b;box-shadow:0 10px 25px rgba(0,0,0,0.45);margin-bottom:20px;display:flex;justify-content:space-between;gap:14px;flex-wrap:wrap;align-items:center;">
+    <div>
+        <h3 style="margin:0;color:#f8fafc;font-size:20px;">Filtered dashboard view</h3>
+        <p style="margin:8px 0 0 0;color:#94a3b8;">{{ transactions|length }} transaction{% if transactions|length != 1 %}s{% endif %} match the current filters.</p>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        {% for filter_label in active_filters %}
+        <span class="dashboard-chip">{{ filter_label }}</span>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
+<div class="dashboard-main-layout" style="display:flex;gap:20px;flex-wrap:wrap;align-items:stretch;">
+    <div class="dashboard-main-column" style="flex:1;min-width:300px;">
+        <div class="dashboard-stat-grid" style="display:grid;grid-template-columns:repeat(2, minmax(0, 1fr));gap:16px;">
+            <div class="dashboard-stat-card" style="background:#020617;border-radius:12px;padding:20px;border:1px solid #1e293b;box-shadow:0 10px 25px rgba(0,0,0,0.5);transition:all 0.2s ease;">
                 <h4 style="margin:0 0 10px 0;color:#94a3b8;font-size:13px;letter-spacing:0.8px;text-transform:uppercase;">Total Income</h4>
                 <h2 style="margin:0;color:#22c55e;font-size:28px;">&#8377;{{ '%.2f'|format(total_income) }}</h2>
             </div>
 
-            <div style="background:#020617;border-radius:12px;padding:20px;border:1px solid #1e293b;box-shadow:0 10px 25px rgba(0,0,0,0.5);transition:all 0.2s ease;">
+            <div class="dashboard-stat-card" style="background:#020617;border-radius:12px;padding:20px;border:1px solid #1e293b;box-shadow:0 10px 25px rgba(0,0,0,0.5);transition:all 0.2s ease;">
                 <h4 style="margin:0 0 10px 0;color:#94a3b8;font-size:13px;letter-spacing:0.8px;text-transform:uppercase;">Total Expense</h4>
                 <h2 style="margin:0;color:#f8fafc;font-size:28px;">&#8377;{{ '%.2f'|format(total_expense) }}</h2>
             </div>
 
-            <div style="background:#020617;border-radius:12px;padding:20px;border:1px solid #1e293b;box-shadow:0 10px 25px rgba(0,0,0,0.5);transition:all 0.2s ease;">
+            <div class="dashboard-stat-card" style="background:#020617;border-radius:12px;padding:20px;border:1px solid #1e293b;box-shadow:0 10px 25px rgba(0,0,0,0.5);transition:all 0.2s ease;">
                 <h4 style="margin:0 0 10px 0;color:#94a3b8;font-size:13px;letter-spacing:0.8px;text-transform:uppercase;">Balance</h4>
                 <h2 style="margin:0;color:#f8fafc;font-size:28px;">&#8377;{{ '%.2f'|format(balance) }}</h2>
             </div>
 
-            <div style="background:#020617;border-radius:12px;padding:20px;border:1px solid #1e293b;box-shadow:0 10px 25px rgba(0,0,0,0.5);transition:all 0.2s ease;">
+            <div class="dashboard-stat-card" style="background:#020617;border-radius:12px;padding:20px;border:1px solid #1e293b;box-shadow:0 10px 25px rgba(0,0,0,0.5);transition:all 0.2s ease;">
                 <h4 style="margin:0 0 10px 0;color:#94a3b8;font-size:13px;letter-spacing:0.8px;text-transform:uppercase;">Savings Rate</h4>
                 <h2 style="margin:0;color:#22c55e;font-size:28px;">{{ '%.2f'|format(savings_rate) }}%</h2>
             </div>
         </div>
 
-        <div style="display:flex;gap:20px;margin-top:20px;flex-wrap:wrap;">
-            <div style="flex:1;background:#020617;padding:20px;border-radius:12px;border:1px solid #1e293b;box-shadow:0 10px 25px rgba(0,0,0,0.5);min-width:240px;">
+        <div class="dashboard-section-split" style="display:flex;gap:20px;margin-top:20px;flex-wrap:wrap;">
+            <div class="dashboard-budget-card" style="flex:1;background:#020617;padding:20px;border-radius:12px;border:1px solid #1e293b;box-shadow:0 10px 25px rgba(0,0,0,0.5);min-width:240px;">
                 <h3 style="margin:0 0 14px 0;font-size:22px;display:inline-block;background:linear-gradient(90deg, #f8fafc, #bbf7d0);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;">Monthly Budget</h3>
                 <p style="margin:0 0 15px 0;color:#94a3b8;line-height:1.7;">
                     {% if budget %}
-                    Current budget: <strong style="color:#f8fafc;">&#8377;{{ '%.2f'|format(budget.amount) }}</strong>
+                    Current budget: <strong style="color:#f8fafc;">&#8377;{{ '%.2f'|format(budget.amount) }}</strong> for {{ monthly_snapshot.month_label }}.
                     {% else %}
-                    Set your monthly budget to track spending.
+                    Set your monthly budget to track spending pace and projected overspending.
                     {% endif %}
                 </p>
 
                 <form method="POST" action="/set_budget">
                     <input type="hidden" name="dashboard_path" value="{{ request.path }}">
-                    <input type="hidden" name="filter_date" value="{{ filter_date }}">
-                    <input type="hidden" name="filter_month" value="{{ filter_month }}">
+                    <input type="hidden" name="filter_date" value="{{ filters['filter_date'] }}">
+                    <input type="hidden" name="filter_month" value="{{ filters['filter_month'] }}">
+                    <input type="hidden" name="search" value="{{ filters['search'] }}">
+                    <input type="hidden" name="transaction_type" value="{{ filters['transaction_type'] }}">
+                    <input type="hidden" name="category" value="{{ filters['category'] }}">
+                    <input type="hidden" name="sort" value="{{ filters['sort'] }}">
                     <input type="hidden" name="month" value="{{ spending_heatmap.month }}">
                     <input type="hidden" name="year" value="{{ spending_heatmap.year }}">
                     <input type="number" name="budget_amount" step="0.01" min="0" value="{{ '%.2f'|format(budget.amount) if budget else '' }}" placeholder="Enter monthly budget" style="width:100%;padding:12px;border-radius:8px;border:1px solid #334155;background:#1e293b;color:white;box-sizing:border-box;margin-bottom:12px;font-size:14px;outline:none;transition:all 0.2s ease;">
@@ -62,9 +263,16 @@
                 {% set budget_bg = '#3f1d24' if budget_exceeded else '#123524' %}
                 {% set budget_text = '#fca5a5' if budget_exceeded else '#86efac' %}
                 {% set budget_border = '#7f1d1d' if budget_exceeded else '#166534' %}
+                {% set budget_progress = monthly_snapshot.budget_used_percentage if monthly_snapshot.budget_used_percentage is not none else 0 %}
+                {% set budget_progress_width = 100 if budget_progress > 100 else budget_progress %}
+                <div style="margin-top:16px;background:#0b1220;border:1px solid #334155;border-radius:999px;height:12px;overflow:hidden;">
+                    <div style="height:100%;width:{{ budget_progress_width }}%;background:{% if budget_exceeded %}linear-gradient(90deg, #ef4444, #fca5a5){% else %}linear-gradient(90deg, #22c55e, #86efac){% endif %};"></div>
+                </div>
                 <div style="margin-top:16px;padding:12px;border-radius:10px;background:{{ budget_bg }};color:{{ budget_text }};border:1px solid {{ budget_border }};">
-                    <strong>Remaining Budget:</strong>
+                    <strong>{{ monthly_snapshot.month_label }} Remaining Budget:</strong>
                     &#8377;{{ '%.2f'|format(remaining_budget) }}
+                    <div style="margin-top:8px;">Budget used: {{ '%.2f'|format(budget_progress) }}%</div>
+                    <div style="margin-top:8px;">Projected month-end spend: &#8377;{{ '%.2f'|format(monthly_snapshot.projected_month_end_expense) }}</div>
                 </div>
                 {% if budget_exceeded %}
                 <p style="margin:10px 0 0 0;color:#fca5a5;font-weight:600;">Warning: You have exceeded your budget.</p>
@@ -72,17 +280,26 @@
                 {% endif %}
             </div>
 
-            <div style="flex:2;background:#020617;padding:20px;border-radius:12px;border:1px solid #1e293b;box-shadow:0 10px 25px rgba(0,0,0,0.5);min-width:280px;">
-                <h3 style="margin:0 0 10px 0;font-size:22px;display:inline-block;background:linear-gradient(90deg, #f8fafc, #bbf7d0);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;">Recent Transactions</h3>
+            <div class="dashboard-transactions-card" style="flex:2;background:#020617;padding:20px;border-radius:12px;border:1px solid #1e293b;box-shadow:0 10px 25px rgba(0,0,0,0.5);min-width:280px;">
+                <div class="dashboard-transactions-header" style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:10px;">
+                    <div>
+                        <h3 style="margin:0;font-size:22px;display:inline-block;background:linear-gradient(90deg, #f8fafc, #bbf7d0);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;">Recent Transactions</h3>
+                        <p style="margin:8px 0 0 0;color:#94a3b8;">{{ transactions|length }} result{% if transactions|length != 1 %}s{% endif %} sorted by {{ sort_options[filters['sort']]|lower }}.</p>
+                    </div>
+                    <a href="{{ download_csv_url }}" style="display:inline-block;background:#1e293b;color:white;padding:10px 14px;border-radius:8px;text-decoration:none;border:1px solid #334155;">Export Current View</a>
+                </div>
 
                 <div class="recent-transactions-scroll" style="max-height:300px;overflow-y:auto;padding-right:10px;">
                     {% if transactions %}
                         {% for t in transactions %}
                         <div style="padding:10px;margin-bottom:10px;background:#1e293b;border-radius:8px;">
-                            <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
-                                <div>
+                            <div class="dashboard-transaction-row" style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;">
+                                <div class="dashboard-transaction-body">
                                     <span style="display:block;color:#f8fafc;font-weight:600;">{{ t.category or 'Income' }}</span>
                                     <span style="display:block;color:#94a3b8;font-size:12px;margin-top:4px;">{{ t.type|title }}{% if t.date %} &bull; {{ t.date.strftime('%Y-%m-%d') }}{% endif %}</span>
+                                    {% if t.description %}
+                                    <p style="margin:8px 0 0 0;color:#cbd5e1;line-height:1.6;">{{ t.description }}</p>
+                                    {% endif %}
                                     {% if t.tags %}
                                     <div style="margin-top:8px;">
                                         {% for tag in t.tags.split(',') %}
@@ -93,9 +310,9 @@
                                     </div>
                                     {% endif %}
                                 </div>
-                                <div style="text-align:right;">
-                                    <span style="color:#22c55e;font-weight:600;">&#8377;{{ '%.2f'|format(t.amount) }}</span>
-                                    <div style="margin-top:8px;display:flex;justify-content:flex-end;gap:6px;flex-wrap:wrap;">
+                                <div class="dashboard-transaction-side" style="text-align:right;">
+                                    <span style="color:{% if t.type == 'income' %}#22c55e{% else %}#f8fafc{% endif %};font-weight:600;">{% if t.type == 'income' %}+{% else %}-{% endif %}&#8377;{{ '%.2f'|format(t.amount) }}</span>
+                                    <div class="dashboard-transaction-actions" style="margin-top:8px;display:flex;justify-content:flex-end;gap:6px;flex-wrap:wrap;">
                                         <a href="/edit/{{ t.id }}" style="background:#22c55e;color:black;padding:6px 9px;border-radius:8px;text-decoration:none;font-size:12px;font-weight:600;transition:all 0.2s ease;">Edit</a>
                                         <a href="/delete/{{ t.id }}" style="background:#3f1d24;color:#fca5a5;padding:6px 9px;border-radius:8px;text-decoration:none;font-size:12px;border:1px solid #7f1d1d;transition:all 0.2s ease;">Delete</a>
                                     </div>
@@ -104,14 +321,14 @@
                         </div>
                         {% endfor %}
                     {% else %}
-                    <p style="text-align:center;color:#94a3b8;">No transactions yet.</p>
+                    <p style="text-align:center;color:#94a3b8;">{% if active_filters %}No transactions matched your current filters.{% else %}No transactions yet.{% endif %}</p>
                     {% endif %}
                 </div>
             </div>
         </div>
     </div>
 
-    <div style="flex:1;min-width:320px;background:#020617;padding:22px;border-radius:12px;border:1px solid #1e293b;box-shadow:0 10px 25px rgba(0,0,0,0.5);text-align:center;transition:all 0.2s ease;">
+    <div class="dashboard-overview-card" style="flex:1;min-width:320px;background:#020617;padding:22px;border-radius:12px;border:1px solid #1e293b;box-shadow:0 10px 25px rgba(0,0,0,0.5);text-align:center;transition:all 0.2s ease;">
         <h3 style="margin-top:0;font-size:24px;display:inline-block;background:linear-gradient(90deg, #f8fafc, #bbf7d0);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;">Spending Overview</h3>
         <p style="margin:6px 0 0 0;color:#94a3b8;">Track the balance between your income and spending trends.</p>
         <img src="/static/chart.png" alt="Expenses by category donut chart" style="width:250px;max-width:100%;margin-top:18px;">
@@ -121,16 +338,68 @@
             <img src="/static/trend.png" alt="Expense trend line chart" style="width:100%;max-width:420px;margin-top:14px;">
         </div>
 
-        <div style="margin-top:22px;display:flex;justify-content:center;gap:10px;flex-wrap:wrap;">
+        <div class="dashboard-overview-actions" style="margin-top:22px;display:flex;justify-content:center;gap:10px;flex-wrap:wrap;">
             <a href="/add" style="display:inline-block;background:#22c55e;color:black;padding:10px 16px;border-radius:8px;text-decoration:none;font-weight:600;transition:all 0.2s ease;box-shadow:0 12px 24px rgba(34,197,94,0.18);">Add Transaction</a>
             <a href="/chart" style="display:inline-block;background:#1e293b;color:white;padding:10px 16px;border-radius:8px;text-decoration:none;border:1px solid #334155;transition:all 0.2s ease;">Open Chart</a>
+            <a href="{{ download_csv_url }}" style="display:inline-block;background:#1e293b;color:white;padding:10px 16px;border-radius:8px;text-decoration:none;border:1px solid #334155;transition:all 0.2s ease;">Export CSV</a>
             <a href="/download_report" style="display:inline-block;background:#1e293b;color:white;padding:10px 16px;border-radius:8px;text-decoration:none;border:1px solid #334155;transition:all 0.2s ease;">Download Report</a>
         </div>
     </div>
 </div>
 
-<div style="display:flex;gap:20px;flex-wrap:wrap;margin-top:24px;align-items:stretch;">
-    <div style="flex:1;min-width:280px;background:#020617;padding:20px;border-radius:12px;border:1px solid #1e293b;box-shadow:0 10px 25px rgba(0,0,0,0.5);transition:all 0.2s ease;">
+<div class="dashboard-summary-layout" style="display:flex;gap:20px;flex-wrap:wrap;margin-top:24px;align-items:stretch;">
+    <div class="dashboard-summary-card" style="flex:1;min-width:280px;background:#020617;padding:20px;border-radius:12px;border:1px solid #1e293b;box-shadow:0 10px 25px rgba(0,0,0,0.5);transition:all 0.2s ease;">
+        <h3 style="margin:0;font-size:22px;display:inline-block;background:linear-gradient(90deg, #f8fafc, #bbf7d0);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;">Monthly Snapshot</h3>
+        <p style="margin:10px 0 0 0;color:#94a3b8;line-height:1.7;">
+            Quick read for {{ monthly_snapshot.month_label }} based on recorded activity.
+        </p>
+
+        <div class="dashboard-mini-grid" style="display:grid;grid-template-columns:repeat(2, minmax(0, 1fr));gap:12px;margin-top:18px;">
+            <div style="background:#111827;border:1px solid #1f2937;border-radius:10px;padding:14px;">
+                <div style="color:#94a3b8;font-size:12px;text-transform:uppercase;letter-spacing:0.8px;">Income</div>
+                <strong style="display:block;margin-top:8px;color:#22c55e;font-size:18px;">&#8377;{{ '%.2f'|format(monthly_snapshot.income_total) }}</strong>
+            </div>
+            <div style="background:#111827;border:1px solid #1f2937;border-radius:10px;padding:14px;">
+                <div style="color:#94a3b8;font-size:12px;text-transform:uppercase;letter-spacing:0.8px;">Expense</div>
+                <strong style="display:block;margin-top:8px;color:#f8fafc;font-size:18px;">&#8377;{{ '%.2f'|format(monthly_snapshot.expense_total) }}</strong>
+            </div>
+            <div style="background:#111827;border:1px solid #1f2937;border-radius:10px;padding:14px;">
+                <div style="color:#94a3b8;font-size:12px;text-transform:uppercase;letter-spacing:0.8px;">Net</div>
+                <strong style="display:block;margin-top:8px;color:{% if monthly_snapshot.net_total < 0 %}#fca5a5{% else %}#22c55e{% endif %};font-size:18px;">&#8377;{{ '%.2f'|format(monthly_snapshot.net_total) }}</strong>
+            </div>
+            <div style="background:#111827;border:1px solid #1f2937;border-radius:10px;padding:14px;">
+                <div style="color:#94a3b8;font-size:12px;text-transform:uppercase;letter-spacing:0.8px;">Active Days</div>
+                <strong style="display:block;margin-top:8px;color:#f8fafc;font-size:18px;">{{ monthly_snapshot.active_days }}</strong>
+            </div>
+        </div>
+
+        {% if monthly_snapshot.transaction_count %}
+        <div style="margin-top:16px;display:grid;gap:10px;">
+            <div style="padding:12px 14px;border-radius:10px;background:#111827;color:#e2e8f0;border-left:4px solid #22c55e;">
+                Projected month-end spend: &#8377;{{ '%.2f'|format(monthly_snapshot.projected_month_end_expense) }}
+            </div>
+            {% if monthly_snapshot.top_spending_day_label %}
+            <div style="padding:12px 14px;border-radius:10px;background:#111827;color:#e2e8f0;border-left:4px solid #22c55e;">
+                Peak day: {{ monthly_snapshot.top_spending_day_label }} for &#8377;{{ '%.2f'|format(monthly_snapshot.top_spending_day_amount) }}
+            </div>
+            {% endif %}
+            {% if monthly_snapshot.largest_expense %}
+            <div style="padding:12px 14px;border-radius:10px;background:#111827;color:#e2e8f0;border-left:4px solid #22c55e;">
+                Largest expense: {{ monthly_snapshot.largest_expense.category }} on {{ monthly_snapshot.largest_expense.date_label }} for &#8377;{{ '%.2f'|format(monthly_snapshot.largest_expense.amount) }}
+            </div>
+            {% endif %}
+            {% if monthly_snapshot.top_tag %}
+            <div style="padding:12px 14px;border-radius:10px;background:#111827;color:#e2e8f0;border-left:4px solid #22c55e;">
+                Most used tag: {{ monthly_snapshot.top_tag.label }} ({{ monthly_snapshot.top_tag.count }} use{% if monthly_snapshot.top_tag.count != 1 %}s{% endif %})
+            </div>
+            {% endif %}
+        </div>
+        {% else %}
+        <p style="margin:16px 0 0 0;color:#94a3b8;">No activity recorded for this month yet.</p>
+        {% endif %}
+    </div>
+
+    <div class="dashboard-summary-card" style="flex:1;min-width:280px;background:#020617;padding:20px;border-radius:12px;border:1px solid #1e293b;box-shadow:0 10px 25px rgba(0,0,0,0.5);transition:all 0.2s ease;">
         <h3 style="margin:0;font-size:22px;display:inline-block;background:linear-gradient(90deg, #f8fafc, #bbf7d0);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;">Future Projection</h3>
         <p style="margin:10px 0 0 0;color:#94a3b8;line-height:1.7;">
             Based on {{ future_projection.months_tracked }} month{% if future_projection.months_tracked != 1 %}s{% endif %} of recorded history.
@@ -146,7 +415,7 @@
         </p>
         {% endif %}
 
-        <div style="display:grid;grid-template-columns:repeat(2, minmax(0, 1fr));gap:12px;margin-top:18px;">
+        <div class="dashboard-mini-grid" style="display:grid;grid-template-columns:repeat(2, minmax(0, 1fr));gap:12px;margin-top:18px;">
             <div style="background:#111827;border:1px solid #1f2937;border-radius:10px;padding:14px;">
                 <div style="color:#94a3b8;font-size:12px;text-transform:uppercase;letter-spacing:0.8px;">Avg Monthly Income</div>
                 <strong style="display:block;margin-top:8px;color:#22c55e;font-size:18px;">&#8377;{{ '%.2f'|format(future_projection.average_monthly_income) }}</strong>
@@ -166,13 +435,13 @@
         </div>
     </div>
 
-    <div style="flex:2;min-width:320px;background:#020617;padding:20px;border-radius:12px;border:1px solid #1e293b;box-shadow:0 10px 25px rgba(0,0,0,0.5);transition:all 0.2s ease;">
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;">
+    <div class="dashboard-heatmap-card" style="flex:2;min-width:320px;background:#020617;padding:20px;border-radius:12px;border:1px solid #1e293b;box-shadow:0 10px 25px rgba(0,0,0,0.5);transition:all 0.2s ease;">
+        <div class="dashboard-heatmap-nav" style="display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;">
             <h3 style="margin:0;font-size:22px;display:inline-block;background:linear-gradient(90deg, #f8fafc, #bbf7d0);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;">Spending Heatmap</h3>
             <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-                <a href="?month={{ spending_heatmap.prev_month }}&year={{ spending_heatmap.prev_year }}{% if filter_date %}&filter_date={{ filter_date }}{% endif %}{% if filter_month %}&filter_month={{ filter_month }}{% endif %}" style="display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;background:#1e293b;color:#f8fafc;border:1px solid #334155;border-radius:8px;text-decoration:none;font-weight:600;transition:all 0.2s ease;">◀</a>
-                <h3 style="margin:0;color:#f8fafc;font-size:20px;min-width:140px;text-align:center;">{{ spending_heatmap.month_name }} {{ spending_heatmap.year }}</h3>
-                <a href="?month={{ spending_heatmap.next_month }}&year={{ spending_heatmap.next_year }}{% if filter_date %}&filter_date={{ filter_date }}{% endif %}{% if filter_month %}&filter_month={{ filter_month }}{% endif %}" style="display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;background:#1e293b;color:#f8fafc;border:1px solid #334155;border-radius:8px;text-decoration:none;font-weight:600;transition:all 0.2s ease;">▶</a>
+                <a href="{{ heatmap_prev_url }}" style="display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;background:#1e293b;color:#f8fafc;border:1px solid #334155;border-radius:8px;text-decoration:none;font-weight:600;transition:all 0.2s ease;">&#9664;</a>
+                <h3 class="dashboard-heatmap-month" style="margin:0;color:#f8fafc;font-size:20px;min-width:140px;text-align:center;">{{ spending_heatmap.month_name }} {{ spending_heatmap.year }}</h3>
+                <a href="{{ heatmap_next_url }}" style="display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;background:#1e293b;color:#f8fafc;border:1px solid #334155;border-radius:8px;text-decoration:none;font-weight:600;transition:all 0.2s ease;">&#9654;</a>
             </div>
         </div>
         <p style="margin:10px 0 0 0;color:#94a3b8;line-height:1.7;">
@@ -182,16 +451,16 @@
         <p style="margin:12px 0 0 0;color:#94a3b8;">No expense activity yet for this month.</p>
         {% endif %}
 
-        <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-top:16px;">
+        <div class="dashboard-heatmap-grid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-top:16px;">
             {% for weekday in spending_heatmap.weekday_labels %}
-            <div style="text-align:center;color:#64748b;font-size:11px;font-weight:600;letter-spacing:0.6px;text-transform:uppercase;">{{ weekday }}</div>
+            <div class="dashboard-heatmap-label" style="text-align:center;color:#64748b;font-size:11px;font-weight:600;letter-spacing:0.6px;text-transform:uppercase;">{{ weekday }}</div>
             {% endfor %}
 
             {% for cell in spending_heatmap.cells %}
                 {% if cell.is_padding %}
-                <div aria-hidden="true" style="height:50px;visibility:hidden;"></div>
+                <div class="dashboard-heatmap-padding" aria-hidden="true" style="height:50px;visibility:hidden;"></div>
                 {% else %}
-                <div title="{{ cell.date_label }}: &#8377;{{ '%.2f'|format(cell.amount) }}" style="
+                <div class="dashboard-heatmap-cell" title="{{ cell.date_label }}: &#8377;{{ '%.2f'|format(cell.amount) }}" style="
                     height:50px;
                     background:{{ cell.color }};
                     border-radius:6px;
@@ -223,22 +492,52 @@
     </div>
 </div>
 
-<div style="background:#020617;margin-top:24px;padding:22px;border-radius:12px;border:1px solid #1e293b;box-shadow:0 10px 25px rgba(0,0,0,0.5);transition:all 0.2s ease;">
+<div class="dashboard-filter-card" style="background:#020617;margin-top:24px;padding:22px;border-radius:12px;border:1px solid #1e293b;box-shadow:0 10px 25px rgba(0,0,0,0.5);transition:all 0.2s ease;">
     <h3 style="margin-top:0;font-size:22px;display:inline-block;background:linear-gradient(90deg, #f8fafc, #bbf7d0);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;">Filter Transactions</h3>
-    <form method="GET" style="display:flex;gap:15px;flex-wrap:wrap;align-items:flex-end;">
+    <p style="margin:10px 0 0 0;color:#94a3b8;line-height:1.7;">Search across tags and descriptions, narrow by transaction type or category, then sort the view before exporting.</p>
+    <form class="dashboard-filter-form" method="GET" style="display:flex;gap:15px;flex-wrap:wrap;align-items:flex-end;margin-top:18px;">
         <input type="hidden" name="month" value="{{ spending_heatmap.month }}">
         <input type="hidden" name="year" value="{{ spending_heatmap.year }}">
-        <div style="flex:1;min-width:220px;">
+        <div class="dashboard-filter-field" style="flex:1;min-width:220px;">
             <label for="filter_date" style="display:block;margin-bottom:8px;color:#94a3b8;font-weight:600;">Filter by Date</label>
-            <input type="date" id="filter_date" name="filter_date" value="{{ filter_date }}" style="width:100%;padding:12px;border-radius:8px;border:1px solid #334155;background:#1e293b;color:white;box-sizing:border-box;outline:none;transition:all 0.2s ease;">
+            <input type="date" id="filter_date" name="filter_date" value="{{ filters['filter_date'] }}" style="width:100%;padding:12px;border-radius:8px;border:1px solid #334155;background:#1e293b;color:white;box-sizing:border-box;outline:none;transition:all 0.2s ease;">
         </div>
-        <div style="flex:1;min-width:220px;">
+        <div class="dashboard-filter-field" style="flex:1;min-width:220px;">
             <label for="filter_month" style="display:block;margin-bottom:8px;color:#94a3b8;font-weight:600;">Filter by Month</label>
-            <input type="month" id="filter_month" name="filter_month" value="{{ filter_month }}" style="width:100%;padding:12px;border-radius:8px;border:1px solid #334155;background:#1e293b;color:white;box-sizing:border-box;outline:none;transition:all 0.2s ease;">
+            <input type="month" id="filter_month" name="filter_month" value="{{ filters['filter_month'] }}" style="width:100%;padding:12px;border-radius:8px;border:1px solid #334155;background:#1e293b;color:white;box-sizing:border-box;outline:none;transition:all 0.2s ease;">
         </div>
-        <div style="display:flex;gap:10px;flex-wrap:wrap;">
-            <button type="submit" style="background:#22c55e;color:black;padding:12px 16px;border:none;border-radius:8px;cursor:pointer;font-weight:600;transition:all 0.2s ease;box-shadow:0 12px 24px rgba(34,197,94,0.18);">Apply Filter</button>
-            <a href="{{ request.path }}?month={{ spending_heatmap.month }}&year={{ spending_heatmap.year }}" style="display:inline-block;background:#1e293b;color:white;padding:12px 16px;border-radius:8px;text-decoration:none;border:1px solid #334155;transition:all 0.2s ease;">Clear</a>
+        <div class="dashboard-filter-field" style="flex:1;min-width:220px;">
+            <label for="search" style="display:block;margin-bottom:8px;color:#94a3b8;font-weight:600;">Search</label>
+            <input type="text" id="search" name="search" value="{{ filters['search'] }}" placeholder="Description, tag, category" style="width:100%;padding:12px;border-radius:8px;border:1px solid #334155;background:#1e293b;color:white;box-sizing:border-box;outline:none;transition:all 0.2s ease;">
+        </div>
+        <div class="dashboard-filter-field" style="flex:1;min-width:220px;">
+            <label for="transaction_type" style="display:block;margin-bottom:8px;color:#94a3b8;font-weight:600;">Transaction Type</label>
+            <select id="transaction_type" name="transaction_type" style="width:100%;padding:12px;border-radius:8px;border:1px solid #334155;background:#1e293b;color:white;box-sizing:border-box;outline:none;transition:all 0.2s ease;">
+                <option value="all" {% if filters['transaction_type'] == 'all' %}selected{% endif %}>All types</option>
+                <option value="income" {% if filters['transaction_type'] == 'income' %}selected{% endif %}>Income</option>
+                <option value="expense" {% if filters['transaction_type'] == 'expense' %}selected{% endif %}>Expense</option>
+            </select>
+        </div>
+        <div class="dashboard-filter-field" style="flex:1;min-width:220px;">
+            <label for="category" style="display:block;margin-bottom:8px;color:#94a3b8;font-weight:600;">Category</label>
+            <select id="category" name="category" style="width:100%;padding:12px;border-radius:8px;border:1px solid #334155;background:#1e293b;color:white;box-sizing:border-box;outline:none;transition:all 0.2s ease;">
+                <option value="">All categories</option>
+                {% for category_name in category_options %}
+                <option value="{{ category_name }}" {% if filters['category'] == category_name %}selected{% endif %}>{{ category_name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="dashboard-filter-field" style="flex:1;min-width:220px;">
+            <label for="sort" style="display:block;margin-bottom:8px;color:#94a3b8;font-weight:600;">Sort By</label>
+            <select id="sort" name="sort" style="width:100%;padding:12px;border-radius:8px;border:1px solid #334155;background:#1e293b;color:white;box-sizing:border-box;outline:none;transition:all 0.2s ease;">
+                {% for sort_key, sort_label in sort_options.items() %}
+                <option value="{{ sort_key }}" {% if filters['sort'] == sort_key %}selected{% endif %}>{{ sort_label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="dashboard-filter-actions" style="display:flex;gap:10px;flex-wrap:wrap;">
+            <button type="submit" style="background:#22c55e;color:black;padding:12px 16px;border:none;border-radius:8px;cursor:pointer;font-weight:600;transition:all 0.2s ease;box-shadow:0 12px 24px rgba(34,197,94,0.18);">Apply Filters</button>
+            <a href="{{ dashboard_clear_url }}" style="display:inline-block;background:#1e293b;color:white;padding:12px 16px;border-radius:8px;text-decoration:none;border:1px solid #334155;transition:all 0.2s ease;">Clear</a>
         </div>
     </form>
 </div>

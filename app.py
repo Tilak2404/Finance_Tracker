@@ -1,19 +1,22 @@
 import ast
 import calendar
+import csv
 import math
 import os
 import shutil
+from collections import Counter
 from datetime import UTC, datetime, timedelta
+from io import StringIO
 from urllib.parse import urlencode
 
 import matplotlib
-from flask import Flask, flash, jsonify, redirect, render_template, request, send_file, session
+from flask import Flask, flash, jsonify, make_response, redirect, render_template, request, send_file, session
 from flask_sqlalchemy import SQLAlchemy
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
-from sqlalchemy import func, inspect, text
+from sqlalchemy import func, inspect, or_, text
 from sqlalchemy.exc import IntegrityError, OperationalError, SQLAlchemyError
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -33,6 +36,7 @@ db = SQLAlchemy(app)
 INITIALIZED_DATABASE_URI = None
 
 VALID_TRANSACTION_TYPES = {"income", "expense"}
+VALID_TRANSACTION_FILTERS = {"all", "income", "expense"}
 KNOWN_PASSWORD_HASH_PREFIXES = ("scrypt:", "pbkdf2:", "argon2:")
 TRANSACTION_CATEGORIES = [
     "Food",
@@ -51,8 +55,17 @@ CATEGORY_CHART_COLORS = {
     "Shopping": "#a855f7",
     "Entertainment": "#f59e0b",
     "Health": "#22c55e",
+    "Education": "#818cf8",
+    "Other": "#94a3b8",
     "Miscellaneous": "#94a3b8",
 }
+DASHBOARD_SORT_OPTIONS = {
+    "newest": "Newest first",
+    "oldest": "Oldest first",
+    "highest": "Highest amount",
+    "lowest": "Lowest amount",
+}
+DEFAULT_DASHBOARD_SORT = "newest"
 ALLOWED_CALCULATOR_BINARY_OPERATORS = {
     ast.Add: lambda left, right: left + right,
     ast.Sub: lambda left, right: left - right,
@@ -68,6 +81,10 @@ ALLOWED_CALCULATOR_UNARY_OPERATORS = {
 
 def utc_now():
     return datetime.now(UTC).replace(tzinfo=None)
+
+
+def normalize_username(value):
+    return (value or "").strip().lower()
 
 
 class User(db.Model):
@@ -282,16 +299,9 @@ def generate_donut_chart(expense_transactions, balance):
     os.makedirs(static_folder, exist_ok=True)
     chart_path = os.path.join(static_folder, "chart.png")
 
-    categories = ["Food", "Transport", "Bills", "Shopping", "Entertainment", "Health"]
-    category_totals = {
-        "Food": 0,
-        "Transport": 0,
-        "Bills": 0,
-        "Shopping": 0,
-        "Entertainment": 0,
-        "Health": 0,
-        "Miscellaneous": 0,
-    }
+    categories = list(TRANSACTION_CATEGORIES)
+    category_totals = {category: 0 for category in categories}
+    category_totals["Miscellaneous"] = 0
 
     for transaction in expense_transactions:
         normalized_category = (transaction.category or "").strip().title()
@@ -486,8 +496,224 @@ def calculate_future_projection(transactions):
     }
 
 
-def build_dashboard_redirect_url(base_path="/", filter_date="", filter_month="", month=None, year=None):
-    if base_path not in {"/", "/dashboard"}:
+def normalize_dashboard_filters(args):
+    filters = {
+        "filter_date": args.get("filter_date", "").strip(),
+        "filter_month": args.get("filter_month", "").strip(),
+        "search": args.get("search", "").strip(),
+        "transaction_type": args.get("transaction_type", "all").strip().lower() or "all",
+        "category": args.get("category", "").strip(),
+        "sort": args.get("sort", DEFAULT_DASHBOARD_SORT).strip().lower() or DEFAULT_DASHBOARD_SORT,
+    }
+    messages = []
+
+    if filters["transaction_type"] not in VALID_TRANSACTION_FILTERS:
+        filters["transaction_type"] = "all"
+        messages.append("Invalid transaction type filter was ignored.")
+
+    if filters["sort"] not in DASHBOARD_SORT_OPTIONS:
+        filters["sort"] = DEFAULT_DASHBOARD_SORT
+        messages.append("Invalid sort option was ignored.")
+
+    return filters, messages
+
+
+def apply_transaction_sort(query, sort_key):
+    if sort_key == "oldest":
+        return query.order_by(Transaction.date.asc(), Transaction.id.asc())
+    if sort_key == "highest":
+        return query.order_by(Transaction.amount.desc(), Transaction.date.desc(), Transaction.id.desc())
+    if sort_key == "lowest":
+        return query.order_by(Transaction.amount.asc(), Transaction.date.desc(), Transaction.id.desc())
+
+    return query.order_by(Transaction.date.desc(), Transaction.id.desc())
+
+
+def apply_transaction_filters(query, filters):
+    applied_filters = dict(filters)
+    messages = []
+
+    if applied_filters["filter_date"]:
+        try:
+            selected_date = datetime.strptime(applied_filters["filter_date"], "%Y-%m-%d").date()
+            query = query.filter(func.date(Transaction.date) == selected_date.isoformat())
+        except ValueError:
+            applied_filters["filter_date"] = ""
+            messages.append("Invalid input. Date filter was ignored.")
+    elif applied_filters["filter_month"]:
+        try:
+            month_start = datetime.strptime(applied_filters["filter_month"], "%Y-%m")
+            if month_start.month == 12:
+                month_end = datetime(month_start.year + 1, 1, 1)
+            else:
+                month_end = datetime(month_start.year, month_start.month + 1, 1)
+            query = query.filter(Transaction.date >= month_start, Transaction.date < month_end)
+        except ValueError:
+            applied_filters["filter_month"] = ""
+            messages.append("Invalid input. Month filter was ignored.")
+
+    if applied_filters["transaction_type"] in VALID_TRANSACTION_TYPES:
+        query = query.filter(Transaction.type == applied_filters["transaction_type"])
+
+    if applied_filters["category"]:
+        query = query.filter(func.lower(Transaction.category) == applied_filters["category"].lower())
+
+    if applied_filters["search"]:
+        pattern = f"%{applied_filters['search']}%"
+        query = query.filter(
+            or_(
+                Transaction.type.ilike(pattern),
+                Transaction.category.ilike(pattern),
+                Transaction.description.ilike(pattern),
+                Transaction.tags.ilike(pattern),
+            )
+        )
+
+    query = apply_transaction_sort(query, applied_filters["sort"])
+    return query, applied_filters, messages
+
+
+def build_category_options(transactions, selected_category=""):
+    seen_categories = {}
+
+    for transaction in transactions:
+        category_name = (transaction.category or "").strip()
+        if not category_name:
+            continue
+        seen_categories.setdefault(category_name.lower(), category_name)
+
+    if selected_category:
+        seen_categories.setdefault(selected_category.lower(), selected_category)
+
+    return [seen_categories[key] for key in sorted(seen_categories)]
+
+
+def build_active_filter_labels(filters):
+    labels = []
+
+    if filters["filter_date"]:
+        labels.append(f"Date: {filters['filter_date']}")
+    elif filters["filter_month"]:
+        labels.append(f"Month: {filters['filter_month']}")
+
+    if filters["search"]:
+        labels.append(f"Search: {filters['search']}")
+    if filters["transaction_type"] != "all":
+        labels.append(f"Type: {filters['transaction_type'].title()}")
+    if filters["category"]:
+        labels.append(f"Category: {filters['category']}")
+    if filters["sort"] != DEFAULT_DASHBOARD_SORT:
+        labels.append(DASHBOARD_SORT_OPTIONS[filters["sort"]])
+
+    return labels
+
+
+def build_monthly_snapshot(transactions, month, year, budget=None):
+    monthly_transactions = [
+        transaction
+        for transaction in transactions
+        if transaction.date and transaction.date.month == month and transaction.date.year == year
+    ]
+    expense_transactions = [
+        transaction for transaction in monthly_transactions if transaction.type == "expense"
+    ]
+    income_transactions = [
+        transaction for transaction in monthly_transactions if transaction.type == "income"
+    ]
+    expense_total = round(sum(transaction.amount for transaction in expense_transactions), 2)
+    income_total = round(sum(transaction.amount for transaction in income_transactions), 2)
+    net_total = round(income_total - expense_total, 2)
+
+    daily_spending = {}
+    for transaction in expense_transactions:
+        date_key = transaction.date.strftime("%Y-%m-%d")
+        daily_spending[date_key] = round(daily_spending.get(date_key, 0.0) + transaction.amount, 2)
+
+    active_days = len(daily_spending)
+    average_active_day_spend = round(expense_total / active_days, 2) if active_days else 0.0
+
+    top_spending_day_label = None
+    top_spending_day_amount = 0.0
+    if daily_spending:
+        top_spending_day = max(daily_spending, key=daily_spending.get)
+        top_spending_day_label = datetime.strptime(top_spending_day, "%Y-%m-%d").strftime("%b %d")
+        top_spending_day_amount = round(daily_spending[top_spending_day], 2)
+
+    largest_expense = max(expense_transactions, key=lambda transaction: transaction.amount, default=None)
+    largest_expense_summary = None
+    if largest_expense is not None:
+        largest_expense_summary = {
+            "amount": round(largest_expense.amount, 2),
+            "category": largest_expense.category or "Miscellaneous",
+            "date_label": largest_expense.date.strftime("%b %d"),
+        }
+
+    tag_counter = Counter()
+    tag_labels = {}
+    for transaction in monthly_transactions:
+        for raw_tag in (transaction.tags or "").split(","):
+            cleaned_tag = raw_tag.strip()
+            if not cleaned_tag:
+                continue
+            normalized_tag = cleaned_tag.lower()
+            tag_counter[normalized_tag] += 1
+            tag_labels.setdefault(normalized_tag, cleaned_tag)
+
+    top_tag = None
+    if tag_counter:
+        top_tag_key, top_tag_count = tag_counter.most_common(1)[0]
+        top_tag = {
+            "label": tag_labels[top_tag_key],
+            "count": top_tag_count,
+        }
+
+    days_in_month = calendar.monthrange(year, month)[1]
+    today = utc_now().date()
+    elapsed_days = today.day if today.year == year and today.month == month else days_in_month
+    projected_month_end_expense = (
+        round((expense_total / max(elapsed_days, 1)) * days_in_month, 2) if expense_total else 0.0
+    )
+
+    budget_amount = round(budget.amount, 2) if budget else None
+    budget_used_percentage = None
+    projected_budget_gap = None
+    if budget_amount:
+        budget_used_percentage = round((expense_total / budget_amount) * 100, 2)
+        projected_budget_gap = round(budget_amount - projected_month_end_expense, 2)
+
+    return {
+        "month": month,
+        "year": year,
+        "month_label": f"{calendar.month_name[month]} {year}",
+        "transaction_count": len(monthly_transactions),
+        "income_total": income_total,
+        "expense_total": expense_total,
+        "net_total": net_total,
+        "active_days": active_days,
+        "average_active_day_spend": average_active_day_spend,
+        "top_spending_day_label": top_spending_day_label,
+        "top_spending_day_amount": top_spending_day_amount,
+        "largest_expense": largest_expense_summary,
+        "top_tag": top_tag,
+        "projected_month_end_expense": projected_month_end_expense,
+        "budget_amount": budget_amount,
+        "budget_used_percentage": budget_used_percentage,
+        "projected_budget_gap": projected_budget_gap,
+    }
+
+
+def build_dashboard_redirect_url(
+    base_path="/",
+    filter_date="",
+    filter_month="",
+    month=None,
+    year=None,
+    search="",
+    transaction_type="all",
+    category="",
+    sort=DEFAULT_DASHBOARD_SORT,
+):
+    if base_path not in {"/", "/dashboard", "/download_csv"}:
         base_path = "/"
 
     query_params = {}
@@ -496,6 +722,14 @@ def build_dashboard_redirect_url(base_path="/", filter_date="", filter_month="",
         query_params["filter_date"] = filter_date
     if filter_month:
         query_params["filter_month"] = filter_month
+    if search:
+        query_params["search"] = search
+    if transaction_type and transaction_type != "all":
+        query_params["transaction_type"] = transaction_type
+    if category:
+        query_params["category"] = category
+    if sort and sort != DEFAULT_DASHBOARD_SORT:
+        query_params["sort"] = sort
     if month:
         query_params["month"] = month
     if year:
@@ -719,7 +953,7 @@ def register():
         return redirect("/")
 
     if request.method == "POST":
-        username = request.form.get("username", "").strip()
+        username = normalize_username(request.form.get("username", ""))
         password = request.form.get("password", "")
         confirm_password = request.form.get("confirm_password", "")
 
@@ -736,7 +970,7 @@ def register():
             return render_template("register.html", error=None)
 
         try:
-            existing_user = User.query.filter_by(username=username).first()
+            existing_user = User.query.filter(func.lower(User.username) == username).first()
             if existing_user:
                 flash("Invalid input. Username already exists.", "error")
                 return render_template("register.html", error=None)
@@ -783,7 +1017,7 @@ def login():
         return redirect("/")
 
     if request.method == "POST":
-        username = request.form.get("username", "").strip()
+        username = normalize_username(request.form.get("username", ""))
         password = request.form.get("password", "")
 
         if not username or not password:
@@ -791,7 +1025,7 @@ def login():
             return render_template("login.html", error=None)
 
         try:
-            user = User.query.filter_by(username=username).first()
+            user = User.query.filter(func.lower(User.username) == username).first()
         except SQLAlchemyError:
             flash("Something went wrong. Please try again.", "error")
             return render_template("login.html", error=None)
@@ -827,12 +1061,20 @@ def set_budget():
     dashboard_path = request.form.get("dashboard_path", "/")
     filter_date = request.form.get("filter_date", "")
     filter_month = request.form.get("filter_month", "")
+    search = request.form.get("search", "")
+    transaction_type = request.form.get("transaction_type", "all")
+    category = request.form.get("category", "")
+    sort = request.form.get("sort", DEFAULT_DASHBOARD_SORT)
     dashboard_month = request.form.get("month", "")
     dashboard_year = request.form.get("year", "")
     dashboard_url = build_dashboard_redirect_url(
         base_path=dashboard_path,
         filter_date=filter_date,
         filter_month=filter_month,
+        search=search,
+        transaction_type=transaction_type,
+        category=category,
+        sort=sort,
         month=dashboard_month,
         year=dashboard_year,
     )
@@ -875,8 +1117,10 @@ def index():
     if "user_id" not in session:
         return redirect("/login")
 
-    filter_date = request.args.get("filter_date", "")
-    filter_month = request.args.get("filter_month", "")
+    filters, filter_messages = normalize_dashboard_filters(request.args)
+    for message in filter_messages:
+        flash(message, "error")
+
     today = utc_now().date()
 
     try:
@@ -889,34 +1133,17 @@ def index():
         heatmap_year = today.year
 
     try:
-        all_transactions = Transaction.query.filter_by(user_id=session["user_id"]).all()
+        user_id = session["user_id"]
+        all_transactions = Transaction.query.filter_by(user_id=user_id).all()
         all_expense_transactions = Transaction.query.filter_by(
             user_id=session["user_id"], type="expense"
         ).all()
-        query = Transaction.query.filter_by(user_id=session["user_id"])
+        query = Transaction.query.filter_by(user_id=user_id)
+        query, filters, filter_application_messages = apply_transaction_filters(query, filters)
+        for message in filter_application_messages:
+            flash(message, "error")
 
-        if filter_date:
-            try:
-                selected_date = datetime.strptime(filter_date, "%Y-%m-%d").date()
-                query = query.filter(func.date(Transaction.date) == selected_date.isoformat())
-            except ValueError:
-                filter_date = ""
-                flash("Invalid input. Date filter was ignored.", "error")
-        elif filter_month:
-            try:
-                month_start = datetime.strptime(filter_month, "%Y-%m")
-                if month_start.month == 12:
-                    month_end = datetime(month_start.year + 1, 1, 1)
-                else:
-                    month_end = datetime(month_start.year, month_start.month + 1, 1)
-                query = query.filter(
-                    Transaction.date >= month_start, Transaction.date < month_end
-                )
-            except ValueError:
-                filter_month = ""
-                flash("Invalid input. Month filter was ignored.", "error")
-
-        transactions = query.order_by(Transaction.date.desc()).all()
+        transactions = query.all()
         expense_transactions = [
             transaction for transaction in transactions if transaction.type == "expense"
         ]
@@ -932,12 +1159,55 @@ def index():
             savings_rate = round((savings / total_income) * 100, 2)
         else:
             savings_rate = 0
-        budget = Budget.query.filter_by(user_id=session["user_id"]).first()
-        remaining_budget = budget.amount - total_expense if budget else None
-        budget_exceeded = budget is not None and total_expense > budget.amount
+        budget = Budget.query.filter_by(user_id=user_id).first()
+        monthly_snapshot = build_monthly_snapshot(all_transactions, heatmap_month, heatmap_year, budget)
+        remaining_budget = (
+            round(budget.amount - monthly_snapshot["expense_total"], 2) if budget else None
+        )
+        budget_exceeded = budget is not None and monthly_snapshot["expense_total"] > budget.amount
         insights = build_insights(expense_transactions, all_expense_transactions)
         future_projection = calculate_future_projection(all_transactions)
-        spending_heatmap = build_spending_heatmap(session["user_id"], heatmap_month, heatmap_year)
+        spending_heatmap = build_spending_heatmap(user_id, heatmap_month, heatmap_year)
+        category_options = build_category_options(all_transactions, filters["category"])
+        active_filters = build_active_filter_labels(filters)
+        download_csv_url = build_dashboard_redirect_url(
+            base_path="/download_csv",
+            filter_date=filters["filter_date"],
+            filter_month=filters["filter_month"],
+            search=filters["search"],
+            transaction_type=filters["transaction_type"],
+            category=filters["category"],
+            sort=filters["sort"],
+            month=heatmap_month,
+            year=heatmap_year,
+        )
+        dashboard_clear_url = build_dashboard_redirect_url(
+            base_path=request.path,
+            month=heatmap_month,
+            year=heatmap_year,
+        )
+        heatmap_prev_url = build_dashboard_redirect_url(
+            base_path=request.path,
+            filter_date=filters["filter_date"],
+            filter_month=filters["filter_month"],
+            search=filters["search"],
+            transaction_type=filters["transaction_type"],
+            category=filters["category"],
+            sort=filters["sort"],
+            month=spending_heatmap["prev_month"],
+            year=spending_heatmap["prev_year"],
+        )
+        heatmap_next_url = build_dashboard_redirect_url(
+            base_path=request.path,
+            filter_date=filters["filter_date"],
+            filter_month=filters["filter_month"],
+            search=filters["search"],
+            transaction_type=filters["transaction_type"],
+            category=filters["category"],
+            sort=filters["sort"],
+            month=spending_heatmap["next_month"],
+            year=spending_heatmap["next_year"],
+        )
         generate_donut_chart(expense_transactions, balance)
         generate_trend_chart(expense_transactions)
     except Exception:
@@ -952,11 +1222,52 @@ def index():
         budget_exceeded = False
         insights = ["Something went wrong."]
         future_projection = calculate_future_projection([])
+        monthly_snapshot = build_monthly_snapshot([], heatmap_month, heatmap_year)
         spending_heatmap = build_spending_heatmap(
             None,
             heatmap_month,
             heatmap_year,
             date_map={},
+        )
+        category_options = build_category_options([], filters["category"])
+        active_filters = build_active_filter_labels(filters)
+        download_csv_url = build_dashboard_redirect_url(
+            base_path="/download_csv",
+            filter_date=filters["filter_date"],
+            filter_month=filters["filter_month"],
+            search=filters["search"],
+            transaction_type=filters["transaction_type"],
+            category=filters["category"],
+            sort=filters["sort"],
+            month=heatmap_month,
+            year=heatmap_year,
+        )
+        dashboard_clear_url = build_dashboard_redirect_url(
+            base_path=request.path,
+            month=heatmap_month,
+            year=heatmap_year,
+        )
+        heatmap_prev_url = build_dashboard_redirect_url(
+            base_path=request.path,
+            filter_date=filters["filter_date"],
+            filter_month=filters["filter_month"],
+            search=filters["search"],
+            transaction_type=filters["transaction_type"],
+            category=filters["category"],
+            sort=filters["sort"],
+            month=spending_heatmap["prev_month"],
+            year=spending_heatmap["prev_year"],
+        )
+        heatmap_next_url = build_dashboard_redirect_url(
+            base_path=request.path,
+            filter_date=filters["filter_date"],
+            filter_month=filters["filter_month"],
+            search=filters["search"],
+            transaction_type=filters["transaction_type"],
+            category=filters["category"],
+            sort=filters["sort"],
+            month=spending_heatmap["next_month"],
+            year=spending_heatmap["next_year"],
         )
 
     return render_template(
@@ -966,14 +1277,23 @@ def index():
         total_expense=total_expense,
         balance=balance,
         savings_rate=savings_rate,
-        filter_date=filter_date,
-        filter_month=filter_month,
+        filters=filters,
+        filter_date=filters["filter_date"],
+        filter_month=filters["filter_month"],
         budget=budget,
         remaining_budget=remaining_budget,
         budget_exceeded=budget_exceeded,
         insights=insights,
         future_projection=future_projection,
+        monthly_snapshot=monthly_snapshot,
         spending_heatmap=spending_heatmap,
+        category_options=category_options,
+        sort_options=DASHBOARD_SORT_OPTIONS,
+        active_filters=active_filters,
+        download_csv_url=download_csv_url,
+        dashboard_clear_url=dashboard_clear_url,
+        heatmap_prev_url=heatmap_prev_url,
+        heatmap_next_url=heatmap_next_url,
     )
 
 
@@ -1132,6 +1452,53 @@ def about():
         return redirect("/login")
 
     return render_template("about.html")
+
+
+@app.route("/download_csv")
+def download_csv():
+    if "user_id" not in session:
+        return redirect("/login")
+
+    filters, _ = normalize_dashboard_filters(request.args)
+
+    try:
+        query = Transaction.query.filter_by(user_id=session["user_id"])
+        query, filters, _ = apply_transaction_filters(query, filters)
+        transactions = query.all()
+    except SQLAlchemyError:
+        flash("Something went wrong while generating the CSV export.", "error")
+        return redirect(
+            build_dashboard_redirect_url(
+                base_path="/",
+                filter_date=filters["filter_date"],
+                filter_month=filters["filter_month"],
+                search=filters["search"],
+                transaction_type=filters["transaction_type"],
+                category=filters["category"],
+                sort=filters["sort"],
+            )
+        )
+
+    output = StringIO()
+    writer = csv.writer(output)
+    writer.writerow(["Date", "Type", "Category", "Description", "Tags", "Amount"])
+
+    for transaction in transactions:
+        writer.writerow(
+            [
+                transaction.date.strftime("%Y-%m-%d") if transaction.date else "",
+                transaction.type.title(),
+                transaction.category or "Miscellaneous",
+                transaction.description or "",
+                transaction.tags or "",
+                f"{transaction.amount:.2f}",
+            ]
+        )
+
+    response = make_response(output.getvalue())
+    response.mimetype = "text/csv"
+    response.headers["Content-Disposition"] = "attachment; filename=transactions-export.csv"
+    return response
 
 
 @app.route("/download_report")

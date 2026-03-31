@@ -6,29 +6,88 @@
     <title>{% block title %}ExpenseStats{% endblock %}</title>
     <link rel="icon" href="{{ url_for('static', filename='favicon.svg') }}" type="image/svg+xml">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        .app-nav-link {
+            transition: all 0.2s ease;
+        }
+
+        @media (max-width: 720px) {
+            .app-nav {
+                flex-direction: column !important;
+                align-items: flex-start !important;
+                gap: 14px !important;
+                padding: 14px 16px !important;
+            }
+
+            .app-brand {
+                font-size: 22px !important;
+                letter-spacing: 0.6px !important;
+            }
+
+            .app-nav-links {
+                width: 100% !important;
+                justify-content: space-between !important;
+                gap: 8px !important;
+            }
+
+            .app-nav-link {
+                display: inline-flex !important;
+                align-items: center !important;
+                justify-content: center !important;
+                padding: 8px 10px !important;
+                border-radius: 8px !important;
+                background: rgba(30, 41, 59, 0.8) !important;
+                border: 1px solid #334155 !important;
+                min-width: 72px !important;
+                box-sizing: border-box !important;
+            }
+
+            .app-shell {
+                padding: 24px 14px 28px !important;
+            }
+
+            .app-hero {
+                margin-bottom: 22px !important;
+            }
+
+            .app-title {
+                font-size: 28px !important;
+                letter-spacing: 0.4px !important;
+            }
+
+            .app-tagline {
+                font-size: 13px !important;
+                letter-spacing: 0.3px !important;
+            }
+
+            .app-flash-stack {
+                margin-bottom: 16px !important;
+            }
+        }
+    </style>
 </head>
 <body style="margin:0;font-family:'Inter', sans-serif;background:#0f172a;color:white;min-height:100vh;">
     {% if session.get('user_id') %}
-    <div style="display:flex;justify-content:space-between;align-items:center;padding:16px 30px;background:#020617;border-bottom:1px solid #1e293b;">
-        <a href="/" style="text-decoration:none;font-size:28px;font-weight:700;letter-spacing:1px;display:inline-block;background:linear-gradient(90deg, #bbf7d0, #22c55e, #14b8a6);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;">ExpenseStats</a>
+    <div class="app-nav" style="display:flex;justify-content:space-between;align-items:center;padding:16px 30px;background:#020617;border-bottom:1px solid #1e293b;">
+        <a class="app-brand" href="/" style="text-decoration:none;font-size:28px;font-weight:700;letter-spacing:1px;display:inline-block;background:linear-gradient(90deg, #bbf7d0, #22c55e, #14b8a6);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;">ExpenseStats</a>
 
-        <div style="display:flex;align-items:center;gap:18px;flex-wrap:wrap;">
-            <a href="/add" style="color:white;text-decoration:none;font-size:14px;transition:all 0.2s ease;">Add</a>
-            <a href="/about" style="color:white;text-decoration:none;font-size:14px;transition:all 0.2s ease;">About</a>
-            <a href="/logout" style="color:#22c55e;text-decoration:none;font-size:14px;font-weight:600;transition:all 0.2s ease;">Logout</a>
+        <div class="app-nav-links" style="display:flex;align-items:center;gap:18px;flex-wrap:wrap;">
+            <a class="app-nav-link" href="/add" style="color:white;text-decoration:none;font-size:14px;transition:all 0.2s ease;">Add</a>
+            <a class="app-nav-link" href="/about" style="color:white;text-decoration:none;font-size:14px;transition:all 0.2s ease;">About</a>
+            <a class="app-nav-link" href="/logout" style="color:#22c55e;text-decoration:none;font-size:14px;font-weight:600;transition:all 0.2s ease;">Logout</a>
         </div>
     </div>
     {% endif %}
 
-    <div style="max-width:1180px;margin:0 auto;padding:32px 20px 36px;box-sizing:border-box;">
-        <div style="text-align:center;margin-bottom:30px;">
-            <h1 style="font-size:36px;font-weight:700;letter-spacing:1px;line-height:1.1;margin:0 0 12px 0;display:inline-block;background:linear-gradient(90deg, #bbf7d0, #22c55e, #14b8a6);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;">ExpenseStats</h1>
-            <p style="color:#94a3b8;font-size:14px;letter-spacing:0.8px;line-height:1.6;margin:0;">Your spending, decoded.</p>
+    <div class="app-shell" style="max-width:1180px;margin:0 auto;padding:32px 20px 36px;box-sizing:border-box;">
+        <div class="app-hero" style="text-align:center;margin-bottom:30px;">
+            <h1 class="app-title" style="font-size:36px;font-weight:700;letter-spacing:1px;line-height:1.1;margin:0 0 12px 0;display:inline-block;background:linear-gradient(90deg, #bbf7d0, #22c55e, #14b8a6);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;">ExpenseStats</h1>
+            <p class="app-tagline" style="color:#94a3b8;font-size:14px;letter-spacing:0.8px;line-height:1.6;margin:0;">Your spending, decoded.</p>
         </div>
 
         {% with messages = get_flashed_messages(with_categories=true) %}
         {% if messages %}
-        <div style="margin:0 auto 20px auto;max-width:900px;">
+        <div class="app-flash-stack" style="margin:0 auto 20px auto;max-width:900px;">
             {% for category, message in messages %}
             {% set flash_bg = '#3f1d24' if category == 'error' else '#123524' %}
             {% set flash_text = '#fca5a5' if category == 'error' else '#86efac' %}

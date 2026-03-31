@@ -44,9 +44,9 @@
                 <p style="text-align:center;color:#94a3b8;font-size:14px;line-height:1.7;margin:0 0 28px 0;">Login to your finance dashboard.</p>
 
                 <form method="POST">
-                    <input type="text" name="username" placeholder="Username" value="{{ request.form.get('username', '') }}" required style="width:100%;padding:12px;margin:0 0 14px 0;border:1px solid #334155;border-radius:8px;background:#1e293b;color:white;box-sizing:border-box;font-size:14px;outline:none;transition:all 0.2s ease;box-shadow:0 0 5px rgba(34,197,94,0.25);">
+                    <input type="text" name="username" placeholder="Username" value="{{ request.form.get('username', '') }}" required autocapitalize="none" autocorrect="off" spellcheck="false" autocomplete="username" style="width:100%;padding:12px;margin:0 0 14px 0;border:1px solid #334155;border-radius:8px;background:#1e293b;color:white;box-sizing:border-box;font-size:14px;outline:none;transition:all 0.2s ease;box-shadow:0 0 5px rgba(34,197,94,0.25);">
 
-                    <input type="password" name="password" placeholder="Password" required style="width:100%;padding:12px;margin:0 0 24px 0;border:1px solid #334155;border-radius:8px;background:#1e293b;color:white;box-sizing:border-box;font-size:14px;outline:none;transition:all 0.2s ease;box-shadow:0 0 5px rgba(34,197,94,0.25);">
+                    <input type="password" name="password" placeholder="Password" required autocomplete="current-password" style="width:100%;padding:12px;margin:0 0 24px 0;border:1px solid #334155;border-radius:8px;background:#1e293b;color:white;box-sizing:border-box;font-size:14px;outline:none;transition:all 0.2s ease;box-shadow:0 0 5px rgba(34,197,94,0.25);">
 
                     <button type="submit" style="width:100%;padding:12px;margin-top:4px;background:#22c55e;color:black;border:none;border-radius:8px;font-weight:600;cursor:pointer;font-size:14px;transition:all 0.2s ease;box-shadow:0 12px 24px rgba(34,197,94,0.18);">Login</button>
                 </form>

@@ -8,7 +8,7 @@ from unittest.mock import patch
 from sqlalchemy.exc import IntegrityError, OperationalError
 from werkzeug.security import check_password_hash
 
-from finance_tracker.app import (
+from app import (
     Budget,
     Transaction,
     User,
@@ -108,7 +108,16 @@ class FinanceTrackerTestCase(unittest.TestCase):
         self.assertEqual(response.status_code, 302)
         self.assertTrue(response.headers["Location"].endswith("/login"))
 
-        for path in ["/add", "/about", "/chart", "/dashboard", "/download_report", "/edit/1", "/delete/1"]:
+        for path in [
+            "/add",
+            "/about",
+            "/chart",
+            "/dashboard",
+            "/download_csv",
+            "/download_report",
+            "/edit/1",
+            "/delete/1",
+        ]:
             route_response = self.client.get(path, follow_redirects=False)
             self.assertEqual(route_response.status_code, 302, path)
             self.assertTrue(route_response.headers["Location"].endswith("/login"), path)
@@ -135,6 +144,7 @@ class FinanceTrackerTestCase(unittest.TestCase):
         with app.app_context():
             user = User.query.filter_by(username="alice").first()
             self.assertIsNotNone(user)
+            self.assertEqual(user.username, "alice")
             self.assertNotEqual(user.password, "secret123")
             self.assertTrue(check_password_hash(user.password, "secret123"))
 
@@ -174,6 +184,37 @@ class FinanceTrackerTestCase(unittest.TestCase):
         self.assertEqual(logout_response.status_code, 200)
         self.assertIn("Login", logout_response.get_data(as_text=True))
 
+    def test_login_and_registration_are_case_insensitive_for_usernames(self):
+        response = self.client.post(
+            "/register",
+            data={
+                "username": "Alice",
+                "password": "secret123",
+                "confirm_password": "secret123",
+            },
+            follow_redirects=True,
+        )
+        self.assertIn("Registration successful", response.get_data(as_text=True))
+
+        with app.app_context():
+            user = User.query.filter_by(username="alice").first()
+            self.assertIsNotNone(user)
+
+        duplicate = self.client.post(
+            "/register",
+            data={
+                "username": "ALICE",
+                "password": "secret123",
+                "confirm_password": "secret123",
+            },
+            follow_redirects=True,
+        )
+        self.assertIn("Username already exists", duplicate.get_data(as_text=True))
+
+        login_response = self.login("ALICE", "secret123")
+        self.assertEqual(login_response.status_code, 200)
+        self.assertIn("ExpenseStats", login_response.get_data(as_text=True))
+
     def test_register_handles_duplicate_username_integrity_error(self):
         duplicate_error = IntegrityError(
             "INSERT INTO user (username, password) VALUES (?, ?)",
@@ -181,7 +222,7 @@ class FinanceTrackerTestCase(unittest.TestCase):
             Exception("UNIQUE constraint failed: user.username"),
         )
 
-        with patch("finance_tracker.app.db.session.commit", side_effect=duplicate_error):
+        with patch("app.db.session.commit", side_effect=duplicate_error):
             response = self.client.post(
                 "/register",
                 data={
@@ -201,7 +242,7 @@ class FinanceTrackerTestCase(unittest.TestCase):
             Exception("database is locked"),
         )
 
-        with patch("finance_tracker.app.db.session.commit", side_effect=locked_error):
+        with patch("app.db.session.commit", side_effect=locked_error):
             response = self.client.post(
                 "/register",
                 data={
@@ -347,11 +388,13 @@ class FinanceTrackerTestCase(unittest.TestCase):
         self.assertNotIn("9999.00", page)
         self.assertIn("55.00%", page)
         self.assertIn("You spent most on Food.", page)
+        self.assertIn("Monthly Snapshot", page)
+        self.assertIn("Projected month-end spend", page)
         self.assertIn("Future Projection", page)
         self.assertIn("Spending Heatmap", page)
         self.assertIn("March 2026", page)
-        self.assertIn("?month=2&year=2026", page)
-        self.assertIn("?month=4&year=2026", page)
+        self.assertIn("?month=2&amp;year=2026", page)
+        self.assertIn("?month=4&amp;year=2026", page)
         self.assertIn("&#8377;13200.00", page)
         self.assertIn("&#8377;6600.00", page)
         self.assertIn("Peak day: &#8377;1000.00", page)
@@ -359,16 +402,78 @@ class FinanceTrackerTestCase(unittest.TestCase):
         filtered_day = self.client.get("/?filter_date=2026-03-20&month=3&year=2026", follow_redirects=True)
         filtered_day_page = filtered_day.get_data(as_text=True)
         self.assertIn("Food", filtered_day_page)
-        self.assertNotIn("Transport", filtered_day_page)
+        self.assertIn("lunch", filtered_day_page)
+        self.assertNotIn("cab", filtered_day_page)
         self.assertIn("&#8377;1000.00", filtered_day_page)
-        self.assertIn("&#8377;800.00", filtered_day_page)
+        self.assertIn("March 2026 Remaining Budget", filtered_day_page)
+        self.assertIn("&#8377;300.00", filtered_day_page)
 
         filtered_month = self.client.get("/?filter_month=2026-02&month=2&year=2026", follow_redirects=True)
         filtered_month_page = filtered_month.get_data(as_text=True)
         self.assertIn("Bills", filtered_month_page)
-        self.assertNotIn("Food", filtered_month_page)
+        self.assertIn("wifi", filtered_month_page)
+        self.assertNotIn("lunch", filtered_month_page)
         self.assertIn("&#8377;-300.00", filtered_month_page)
         self.assertIn("February 2026", filtered_month_page)
+
+    def test_dashboard_search_sort_category_and_csv_export(self):
+        user_id = self.create_user("alice")
+        self.create_transaction(
+            user_id,
+            5000,
+            "income",
+            category="Salary",
+            description="Main salary credit",
+            tags="monthly",
+            when=datetime(2026, 3, 1),
+        )
+        self.create_transaction(
+            user_id,
+            400,
+            "expense",
+            category="Transport",
+            description="Airport cab",
+            tags="travel",
+            when=datetime(2026, 3, 3),
+        )
+        self.create_transaction(
+            user_id,
+            250,
+            "expense",
+            category="Food",
+            description="Lunch box",
+            tags="meal",
+            when=datetime(2026, 3, 2),
+        )
+
+        self.login("alice", "secret123")
+
+        dashboard = self.client.get(
+            "/?search=airport&transaction_type=expense&category=Transport&sort=lowest&month=3&year=2026",
+            follow_redirects=True,
+        )
+        page = dashboard.get_data(as_text=True)
+        self.assertIn("Filtered dashboard view", page)
+        self.assertIn("Search: airport", page)
+        self.assertIn("Type: Expense", page)
+        self.assertIn("Category: Transport", page)
+        self.assertIn("Airport cab", page)
+        self.assertNotIn("Lunch box", page)
+        self.assertNotIn("Main salary credit", page)
+        self.assertIn("Export Current View", page)
+
+        csv_response = self.client.get(
+            "/download_csv?search=airport&transaction_type=expense&category=Transport&sort=lowest&month=3&year=2026",
+            follow_redirects=False,
+        )
+        self.assertEqual(csv_response.status_code, 200)
+        self.assertEqual(csv_response.mimetype, "text/csv")
+        self.assertIn("transactions-export.csv", csv_response.headers["Content-Disposition"])
+
+        csv_text = csv_response.get_data(as_text=True)
+        self.assertIn("Airport cab", csv_text)
+        self.assertNotIn("Lunch box", csv_text)
+        self.assertNotIn("Main salary credit", csv_text)
 
     def test_future_projection_helper_averages_monthly_history(self):
         user_id = self.create_user("alice")
@@ -633,7 +738,7 @@ class FinanceTrackerTestCase(unittest.TestCase):
             return report_path
 
         try:
-            with patch("finance_tracker.app.generate_pdf_report", side_effect=fake_generate_pdf_report):
+            with patch("app.generate_pdf_report", side_effect=fake_generate_pdf_report):
                 response = self.client.get("/download_report", follow_redirects=False)
 
             self.assertEqual(response.status_code, 200)
